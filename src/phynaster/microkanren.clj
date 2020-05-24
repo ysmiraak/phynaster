@@ -184,3 +184,8 @@
       (=== (cons l s) ls)
       (=== (cons l srs) lsrs)
       (appendo s rs srs))]))
+
+(defn inserto [y xs xys]
+  (fresh [lhs rhs]
+    (appendo lhs rhs xs)
+    (appendo lhs (cons y rhs) xys)))
