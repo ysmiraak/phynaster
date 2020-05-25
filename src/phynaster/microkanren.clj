@@ -6,6 +6,10 @@
 ;; a lvar is implemented as a vector/list whose head is ::lvar,
 ;; to circumvent the restriction in clojure that sequences must have proper tails,
 ;; so that a lvar could unify with a tail.
+;;
+;; id of type Nat is reserved for fresh,
+;; when constructing lvar manually,
+;; one must supply an id of another type.
 
 (defn lvar [id] [::lvar id])
 (defn lvar? [x] (and (sequential? x) (= (first x) ::lvar)))
@@ -15,12 +19,12 @@
 ;; unification rules ;;
 ;;;;;;;;;;;;;;;;;;;;;;;
 
-;; SMap = Map LVar Term | nil
+;; SMap = Map LVar Term
 ;; walk : Term * SMap -> Term
-;; unify : Term * Term * SMap -> SMap
+;; unify : Term * Term * SMap -> Maybe SMap
 ;;
-;; smap = {}   means trivial
-;; smap = nil  means failure
+;; unify returns {}   means success trivially
+;; unify returns nil  means failure
 
 (defn walk [u smap]
   (if (and (lvar? u) (contains? smap u))
@@ -30,10 +34,9 @@
 (defn unify [u v smap]
   (let [u (walk u smap)  v (walk v smap)]
     (cond
-      ;; already unify
+      ;; already unify, return smap unmodified (capply relies on this behavior)
       (= u v) smap
-      ;; unify lvar with some other value in the substitution map
-      ;; TODO could this be simplied if both u v are lvar?
+      ;; extend smap for lvar
       (lvar? u) (assoc smap u v)
       (lvar? v) (assoc smap v u)
       ;; unify sequences recursively
@@ -84,12 +87,54 @@
 (defn unit [state]
   (Node. state zero))
 
+(defn make-node [?state]
+  (if-let [state ?state]
+    (unit state)
+    zero))
+
+;;;;;;;;;;;;;;;;;
+;; constraints ;;
+;;;;;;;;;;;;;;;;;
+
+;; capply : IConstraint * State -> Maybe State
+;; creify : IConstraint * SMap -> SMap ???? TODO
+;; ccheck : State -> Maybe State
+
+(defprotocol IConstraint
+  (capply [this state]))
+
+(defrecord C=!= [u v]
+  ;; TODO commutative, u v order does not matter, can also be extend to multivariate
+  IConstraint
+  (capply [this {:keys [smap] :as state}]
+    (let [?smap (unify u v smap)]
+      (cond
+        ;; unification fails, already disequal, throw constraint away
+        (nil? ?smap)      (update state :cset disj this)
+        ;; unification succeeds by extending smap, keep for future
+        (not= ?smap smap) (update state :cset conj this)
+        ;; unification succeeds without extending smap, fail
+        ))))
+
+(defn =!= [u v]
+  (fn [state]
+    (-> (C=!=. u v)
+        (capply state)
+        make-node)))
+
+(defn ccheck [{:keys [cset] :as state}]
+  (reduce (fn [?state constraint]
+            (when-let [state ?state]
+              (capply constraint state)))
+          state cset))
+
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; basic constructs ;;
 ;;;;;;;;;;;;;;;;;;;;;;
 
-;; State = SMap * NVar
+;; State = SMap * NVar * CSet
 ;; NVar = Nat
+;; Cset = Set IConstraint
 ;;
 ;; Goal = State -> INode
 ;;
@@ -97,17 +142,20 @@
 ;; disjoin : Goal * Goal -> INode
 ;; conjoin : Goal * Goal -> INode
 
-(defrecord State [smap nvar])
-(def initial-state (State. {} 0))
+(defrecord State [smap nvar cset])
+(def initial-state (State. {} 0 #{}))
 
 (defn === [u v]
   (fn [{:keys [smap] :as state}]
-    (if-let [smap (unify u v smap)]
-      (unit (assoc state :smap smap))
-      zero)))
+    (make-node
+     (when-let [smap (unify u v smap)]
+       (ccheck (assoc state :smap smap))))))
 
 (defn disjoin [goal goal'] (fn [state] (plus (goal state) (goal' state))))
 (defn conjoin [goal goal'] (fn [state] (bind (goal state) goal')))
+
+(defn g1 [state] (unit state))
+(defn g0 [state] zero)
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; user interface ;;
@@ -189,3 +237,16 @@
   (fresh [lhs rhs]
     (appendo lhs rhs xs)
     (appendo lhs (cons y rhs) xys)))
+
+(defn rembero [x ls out]
+  (conde
+   [(=== () ls) (=== () out)]
+   [(fresh [a d]
+      (=== (cons a d) ls)
+      (=== a x)
+      (=== d out))]
+   [(fresh [a d res]
+      (=== (cons a d) ls)
+      (=!= a x)
+      (=== (cons a res) out)
+      (rembero x d res))]))

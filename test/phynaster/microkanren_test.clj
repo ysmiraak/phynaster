@@ -99,3 +99,63 @@
        {:p ?0, :q (?1 ?2 ?3 . ?4), :r (?1 ?2 ?3 ?0 . ?4)})
      "insert p into q as r
 "))
+
+(deftest test-=!=
+  ($ (run* [p q]
+       (=== p 1)
+       (=!= p 1))
+     '()
+     "=!= after ===
+")
+  ($ (run* [p q]
+       (=!= p 1)
+       (=== p 1))
+     '()
+     "=!= before ===
+")
+  ($ (run* [p q]
+       (=== p 1)
+       (=!= p q)
+       (=== q 1))
+     '()
+     "=!= between ===
+")
+  ($ (run* [p x y]
+       (=!= [5 6] p)
+       (=== [x y] p)
+       (=== 5 x)
+       (=== 6 y))
+     '()
+     "=!= on sequence
+")
+  ($ (run* [p x y]
+       (=!= [5 6] p)
+       (=== [x y] p)
+       (=== 5 x)
+       (=== 7 y))
+     '({:p (5 7), :x 5, :y 7})
+     "=!= succeed
+"))
+
+(deftest test-rembero
+  ($ (run* [q]
+       (rembero 'b '(a b c b d) q))
+     '({:q (a c b d)})
+     "rembero removes only first occurence
+")
+  ($ (run* [q]
+       (rembero 'b '(b) '(b)))
+     '()
+     "rembero removes at least one
+")
+  ($ (run* [q]
+       (fresh [x out]
+         (rembero x '(a b c) out)
+         (=== [x out] q)))
+     '({:q (a (b c))}
+       {:q (b (a c))}
+       {:q (c (a b))}
+       {:q (?0 (a b c))})
+     "rembero with reified constraints
+TODO (=!= ?0 c) (=!= ?0 b) (=!= ?0 a)
+"))
