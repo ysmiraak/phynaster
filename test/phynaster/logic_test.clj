@@ -1,7 +1,7 @@
-(ns phynaster.microkanren-test
+(ns phynaster.logic-test
   (:require [clojure.test :refer :all]
             [phynaster.core-test :refer [$]]
-            [phynaster.microkanren :refer :all]))
+            [phynaster.logic :refer :all]))
 
 (deftest test-unification
   ($ (run* [q]

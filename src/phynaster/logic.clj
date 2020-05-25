@@ -1,4 +1,4 @@
-(ns phynaster.microkanren)
+(ns phynaster.logic)
 
 ;; Term = LVar | Value
 ;;
@@ -250,3 +250,9 @@
       (=!= a x)
       (=== (cons a res) out)
       (rembero x d res))]))
+
+;; TODO
+;; - finite domain constraints
+;; - transparent representation
+;; - make operators operads
+;; - reify constraints
