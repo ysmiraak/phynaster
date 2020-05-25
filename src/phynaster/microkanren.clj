@@ -15,31 +15,31 @@
 ;; unification rules ;;
 ;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Env = Map LVar Term | nil
-;; walk : Term * Env -> Term
-;; unify : Term * Term * Env -> Env
+;; SMap = Map LVar Term | nil
+;; walk : Term * SMap -> Term
+;; unify : Term * Term * SMap -> SMap
 ;;
-;; env = {}   means trivial
-;; env = nil  means failure
+;; smap = {}   means trivial
+;; smap = nil  means failure
 
-(defn walk [u env]
-  (if (and (lvar? u) (contains? env u))
-    (recur (env u) env)
+(defn walk [u smap]
+  (if (and (lvar? u) (contains? smap u))
+    (recur (smap u) smap)
     u))
 
-(defn unify [u v env]
-  (let [u (walk u env)  v (walk v env)]
+(defn unify [u v smap]
+  (let [u (walk u smap)  v (walk v smap)]
     (cond
       ;; already unify
-      (= u v) env
+      (= u v) smap
       ;; unify lvar with some other value in the substitution map
       ;; TODO could this be simplied if both u v are lvar?
-      (lvar? u) (assoc env u v)
-      (lvar? v) (assoc env v u)
+      (lvar? u) (assoc smap u v)
+      (lvar? v) (assoc smap v u)
       ;; unify sequences recursively
       (and (toseq u) (toseq v))
-      (when-let [env (unify (first u) (first v) env)]
-        (recur (rest u) (rest v) env)))))
+      (when-let [smap (unify (first u) (first v) smap)]
+        (recur (rest u) (rest v) smap)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; inference engine ;;
@@ -88,8 +88,8 @@
 ;; basic constructs ;;
 ;;;;;;;;;;;;;;;;;;;;;;
 
-;; State = Env * Cnt
-;; Cnt = Nat
+;; State = SMap * NVar
+;; NVar = Nat
 ;;
 ;; Goal = State -> INode
 ;;
@@ -97,13 +97,13 @@
 ;; disjoin : Goal * Goal -> INode
 ;; conjoin : Goal * Goal -> INode
 
-(defrecord State [env cnt])
+(defrecord State [smap nvar])
 (def initial-state (State. {} 0))
 
 (defn === [u v]
-  (fn [{:keys [env] :as state}]
-    (if-let [env (unify u v env)]
-      (unit (assoc state :env env))
+  (fn [{:keys [smap] :as state}]
+    (if-let [smap (unify u v smap)]
+      (unit (assoc state :smap smap))
       zero)))
 
 (defn disjoin [goal goal'] (fn [state] (plus (goal state) (goal' state))))
@@ -128,9 +128,9 @@
                  goals)))
 
 (defn call-fresh [lvar->goal]
-  (fn [{:keys [cnt] :as state}]
-    ((lvar->goal (lvar cnt))
-     (assoc state :cnt (inc cnt)))))
+  (fn [{:keys [nvar] :as state}]
+    ((lvar->goal (lvar nvar))
+     (assoc state :nvar (inc nvar)))))
 
 (defmacro fresh [vars & goals]
   (if (empty? vars)
@@ -148,21 +148,21 @@
         call-goal
         pull))
 
-(defn query-result [vars {:keys [env cnt]}]
+(defn query-result [vars {:keys [smap nvar]}]
   (letfn [(unk [n] (symbol (str \? n)))
           (dot [v] (if (symbol? v) `(. ~v) v))
-          (walk* [v env]
-            (let [v (walk v env)]
+          (walk* [v smap]
+            (let [v (walk v smap)]
               (cond (lvar? v) v
-                    (toseq v) (cons (walk* (first v) env) (dot (walk* (rest v) env)))
+                    (toseq v) (cons (walk* (first v) smap) (dot (walk* (rest v) smap)))
                     :else v)))
-          (fill* [v env]
-            (let [v (walk v env)]
-              (cond (lvar? v) (assoc env v (unk (count env)))
-                    (toseq v) (fill* (rest v) (fill* (first v) env))
-                    :else env)))]
-    (as-> (lvar cnt) v
-      (walk* v (assoc env v (->> vars count range (map lvar))))
+          (fill* [v smap]
+            (let [v (walk v smap)]
+              (cond (lvar? v) (assoc smap v (unk (count smap)))
+                    (toseq v) (fill* (rest v) (fill* (first v) smap))
+                    :else smap)))]
+    (as-> (lvar nvar) v
+      (walk* v (assoc smap v (->> vars count range (map lvar))))
       (zipmap (map keyword vars)
               (walk* v (fill* v {}))))))
 
