@@ -98,7 +98,7 @@
   (pull [this] ()))
 
 (extend-protocol Node
-  clojure.lang.IFn
+  clojure.lang.Fn
   (bind [this goal] #(bind (this) goal))
   (plus [this that] #(plus that (this)))
   (pull [this] (pull (trampoline this))))
