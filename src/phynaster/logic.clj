@@ -195,7 +195,7 @@
 (defn |
   ([] g0)
   ([g] g)
-  ([g g'] (fn [unit] #(plus (g unit) (g' unit))))
+  ([g g'] (fn [unit] (plus (g unit) #(g' unit))))
   ([g g' & gs] (reduce | g (cons g' gs))))
 
 (defn all [gs] (apply & gs))
