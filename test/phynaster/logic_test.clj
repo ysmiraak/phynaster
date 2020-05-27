@@ -34,33 +34,33 @@
      "p = q, r
 ")
   ($ (run* [p q]
-       (fresh [r]
+       (exist [r]
          (=== p [1 r])
          (=== q [r 2])))
      '({:p (1 ?0), :q (?0 2)})
      "p = [1 r], q = [r 2]
 "))
 
-(deftest test-conso
+(deftest test-=cons
   ($ (run* [p q]
-       (=== (cons p q) [1 2 3]))
+       (=cons p q [1 2 3]))
      '({:p 1, :q (2 3)})
      "(p . q) = [1 2 3]
 ")
   ($ (run* [p q]
-       (=== (cons 1 p) q))
+       (=cons 1 p q))
      '({:p ?0, :q (1 . ?0)})
      "(1 . p) = q with improper tail
 "))
 
-(deftest test-appendo
+(deftest test-=append
   ($ (run* [r]
-       (appendo [1 2] [3 4] r))
+       (=append [1 2] [3 4] r))
      '({:r (1 2 3 4)})
      "[1 2] ++ [3 4] = r
 ")
   ($ (run* [p q]
-       (appendo p q [1 2 3 4]))
+       (=append p q [1 2 3 4]))
      '({:p (), :q (1 2 3 4)}
        {:p (1), :q (2 3 4)}
        {:p (1 2), :q (3 4)}
@@ -69,7 +69,7 @@
      "p ++ q = [1 2 3 4]
 ")
   ($ (run 4 [p q r]
-       (appendo p q r))
+       (=append p q r))
      '({:p (), :q ?0, :r ?0}
        {:p (?0), :q ?1, :r (?0 . ?1)}
        {:p (?0 ?1), :q ?2, :r (?0 ?1 . ?2)}
@@ -77,22 +77,22 @@
      "p ++ q = r
 "))
 
-(deftest test-inserto
+(deftest test-=insert
   ($ (run* [q]
-       (inserto 1 [0 2] [0 q 2]))
+       (=insert 1 [0 2] [0 q 2]))
      '({:q 1})
      "insert 1 into [0 2] as [0 q 2]
 ")
 
   ($ (run* [q]
-       (inserto 1 [0 2] q))
+       (=insert 1 [0 2] q))
      '({:q (1 0 2)}
        {:q (0 1 2)}
        {:q (0 2 1)})
      "insert 1 into [0 2] as q
 ")
   ($ (run 4 [p q r]
-       (inserto p q r))
+       (=insert p q r))
      '({:p ?0, :q ?1, :r (?0 . ?1)}
        {:p ?0, :q (?1 . ?2), :r (?1 ?0 . ?2)}
        {:p ?0, :q (?1 ?2 . ?3), :r (?1 ?2 ?0 . ?3)}
@@ -137,25 +137,25 @@
      "=!= succeed
 "))
 
-(deftest test-rembero
+(deftest test-=rember
   ($ (run* [q]
-       (rembero 'b '(a b c b d) q))
+       (=rember 'b '(a b c b d) q))
      '({:q (a c b d)})
-     "rembero removes only first occurence
+     "rember only first occurence
 ")
   ($ (run* [q]
-       (rembero 'b '(b) '(b)))
+       (=rember 'b '(b) '(b)))
      '()
-     "rembero removes at least one
+     "rember at least one
 ")
   ($ (run* [q]
-       (fresh [x out]
-         (rembero x '(a b c) out)
+       (exist [x out]
+         (=rember x '(a b c) out)
          (=== [x out] q)))
      '({:q (a (b c))}
        {:q (b (a c))}
        {:q (c (a b))}
        {:q (?0 (a b c))})
-     "rembero with reified constraints
+     "rember with reified constraints
 TODO (=!= ?0 c) (=!= ?0 b) (=!= ?0 a)
 "))

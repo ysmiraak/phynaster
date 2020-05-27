@@ -11,7 +11,7 @@
 ;; to circumvent the restriction in clojure that sequences must have proper tails,
 ;; so that a lvar could unify with a tail.
 ;;
-;; id of type Nat is reserved for fresh,
+;; id of type Nat is reserved for exist,
 ;; when constructing lvar manually,
 ;; one must supply an id of another type.
 
@@ -52,198 +52,179 @@
 ;; inference engine ;;
 ;;;;;;;;;;;;;;;;;;;;;;
 
-;; INode =
-;; | cont : () -> INode
-;; | node : Node = State * INode
+;; Node =
+;; | cont : () -> Node
+;; | pair : Pair = Unit * Node
+;; | unit : Unit = SMap * NVar * CSet
 ;; | zero = nil
 ;;
-;; an inode in the search tree can be
+;; a node in the search tree can be
 ;; - cont, a continuation/thunk which when called may eventually produce a mature node
-;; - node, a mature node containing a state and more possible inodes
-;; - zero, a mature node reprenseting no (more) results
+;; - zero, a mature node reprenseting a failure state
+;; - unit, a mature node representing a success state
+;; - pair, a mature node containing a state unit and a successor node
 ;;
-;; unit : State -> Node
-;; bind : INode *  Goal -> INode
-;; plus : INode * INode -> INode
-;; pull : INode -> LazySeq State
+;; NVar = Nat
+;; CSet = Set Constraint
+;; Goal = Unit -> Node
+;;
+;; bind : Node * Goal -> Node
+;; plus : Node * Node -> Node
+;; pull : Node -> LazySeq Unit
 
-(def zero nil)
-(defrecord Node [state inode])
-(defprotocol INode
+(defprotocol Node
   (bind [this goal])
   (plus [this that])
   (pull [this]))
 
-(extend-protocol INode
-  clojure.lang.IFn
-  (bind [this goal] #(bind (this) goal))
-  (plus [this that] #(plus that (this)))
-  (pull [this] (pull (trampoline this)))
+(defrecord Pair [unit node]
   Node
-  (bind [{:keys [state inode]} goal] (plus (goal state) (bind inode goal)))
-  (plus [{:keys [state inode]} that] (Node. state (plus inode that)))
-  (pull [{:keys [state inode]}] (lazy-seq (cons state (pull inode))))
+  (bind [this goal] (plus (goal unit) (bind node goal)))
+  (plus [this that] (Pair. unit (plus node that)))
+  (pull [this] (lazy-seq (cons unit (lazy-seq (pull node))))))
+
+(defrecord Unit [smap nvar cset]
+  Node
+  (bind [this goal] (goal this))
+  (plus [this that] (Pair. this that))
+  (pull [this] (list this)))
+(def alpha (Unit. {} 0 #{}))
+
+(def zero nil)
+(extend-protocol Node
   nil
   (bind [this goal] zero)
   (plus [this that] that)
   (pull [this] ()))
 
-(defn unit [state]
-  (Node. state zero))
+(extend-protocol Node
+  clojure.lang.IFn
+  (bind [this goal] #(bind (this) goal))
+  (plus [this that] #(plus that (this)))
+  (pull [this] (pull (trampoline this))))
 
-(defn make-node [?state]
-  (if-let [state ?state]
-    (unit state)
-    zero))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; goals and constraints ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;;;;;;;;;;;;;;;;
-;; constraints ;;
-;;;;;;;;;;;;;;;;;
+;; === : Term * Term -> Goal
+;;
+;; capply : Constraint * Unit -> Maybe Unit
+;; creify : Constraint * SMap -> SMap ???? TODO
+;; ccheck : Unit -> Maybe Unit
 
-;; capply : IConstraint * State -> Maybe State
-;; creify : IConstraint * SMap -> SMap ???? TODO
-;; ccheck : State -> Maybe State
+(defprotocol Constraint
+  (capply [this unit]))
 
-(defprotocol IConstraint
-  (capply [this state]))
-
-(defn ccheck [{:keys [cset] :as state}]
-  (reduce (fn [?state constraint]
-            (if-let [state ?state]
-              (capply constraint state)
+(defn ccheck [{:keys [cset] :as unit}]
+  (reduce (fn [?unit constraint]
+            (if-let [unit ?unit]
+              (capply constraint unit)
               (reduced nil)))
-          state cset))
+          unit cset))
+
+(defn === [u v]
+  (fn [{:keys [smap] :as unit}]
+    (when-let [smap (unify u v smap)]
+      (ccheck (assoc unit :smap smap)))))
 
 (defrecord C=!= [u v]
   ;; TODO commutative, u v order does not matter, can also be extend to multivariate
-  IConstraint
-  (capply [this {:keys [smap] :as state}]
+  Constraint
+  (capply [this {:keys [smap] :as unit}]
     (let [?smap (unify u v smap)]
       (cond
         ;; unification fails, already disequal, throw constraint away
-        (nil? ?smap)      (update state :cset disj this)
+        (nil? ?smap)      (update unit :cset disj this)
         ;; unification succeeds by extending smap, keep for future
-        (not= ?smap smap) (update state :cset conj this)
+        (not= ?smap smap) (update unit :cset conj this)
         ;; unification succeeds without extending smap, fail
-        ))))
+        :else zero))))
 
 (defn =!= [u v]
-  (fn [state]
+  (fn [unit]
     (-> (C=!=. u v)
-        (capply state)
-        make-node)))
+        (capply unit))))
 
-(defrecord Cdomain [u dom]
+(defrecord C=domain [u dom]
   ;; dom : Set Value
-  IConstraint
-  (capply [this {:keys [smap] :as state}]
+  Constraint
+  (capply [this {:keys [smap] :as unit}]
     (let [u (walk u smap)]
       (cond
         ;; unbound, keep for future
-        (lvar? u)         (update state :cset conj this)
+        (lvar? u)         (update unit :cset conj this)
         ;; satisfied, throw constraint away
-        (contains? dom u) (update state :cset disj this)
+        (contains? dom u) (update unit :cset disj this)
         ;; violated, fail
-        ))))
+        :else zero))))
 
-(defn domain [u dom]
-  (fn [state]
-    (-> (Cdomain. u dom)
-        (capply state)
-        make-node)))
+(defn =domain [u dom]
+  (fn [unit]
+    (-> (C=domain. u dom)
+        (capply unit))))
 
-(defrecord Cunique [qs]
-  IConstraint
-  (capply [this {:keys [smap] :as state}]
+(defrecord C=unique [qs]
+  Constraint
+  (capply [this {:keys [smap] :as unit}]
     (let [us (map #(walk % smap) qs)]
       (cond
         ;; violated, fail
-        (not (apply distinct? us)) nil
+        (not (apply distinct? us))              zero
         ;; unbound, keep for future
-        (some lvar? us) (update state :cset conj this)
+        (some lvar? us) (update unit :cset conj this)
         ;; satisfied, throw constraint away
-        :else           (update state :cset disj this)
-        ))))
+        :else           (update unit :cset disj this)))))
 
-(defn unique [& qs]
-  (fn [state]
-    (-> (Cunique. (vec qs))
-        (capply state)
-        make-node)))
+(defn =unique [& qs]
+  (fn [unit]
+    (-> (C=unique. (vec qs))
+        (capply unit))))
 
-;;;;;;;;;;;;;;;;;;;;;;
-;; basic constructs ;;
-;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; conjunction and disjunction ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; State = SMap * NVar * CSet
-;; NVar = Nat
-;; Cset = Set IConstraint
-;;
-;; Goal = State -> INode
-;;
-;; === : Term * Term -> Node
-;; disjoin : Goal * Goal -> Goal
-;; conjoin : Goal * Goal -> Goal
+(defn g1 [unit] unit)
+(defn g0 [unit] zero)
 
-(defrecord State [smap nvar cset])
-(def initial-state (State. {} 0 #{}))
+(defn &
+  ([] g1)
+  ([& gs] (fn [unit] (reduce bind unit gs))))
 
-(defn === [u v]
-  (fn [{:keys [smap] :as state}]
-    (make-node
-     (when-let [smap (unify u v smap)]
-       (ccheck (assoc state :smap smap))))))
+(defn |
+  ([] g0)
+  ([g] g)
+  ([g g'] (fn [unit] #(plus (g unit) (g' unit))))
+  ([g g' & gs] (reduce | g (cons g' gs))))
 
-(defn disjoin [goal goal'] (fn [state] (plus (goal state) (goal' state))))
-(defn conjoin [goal goal'] (fn [state] (bind (goal state) goal')))
-
-(defn g0 [state] zero)
-(defn g1 [state] (unit state))
-
-(defn any [gs]
-  (reduce (fn [g g'] (fn [state] (plus (fn [] (g state)) (g' state))))
-          g0 gs))
-
-(defn all [gs]
-  (reduce (fn [g g'] (fn [state] (bind (fn [] (g state)) g')))
-          g1 gs))
+(defn all [gs] (apply & gs))
+(defn any [gs] (apply | gs))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; user interface ;;
 ;;;;;;;;;;;;;;;;;;;;
 
-(defmacro defer [goal] `(fn [state#] (fn [] (~goal state#))))
-
-(defmacro disj+
-  ([goal] `(defer ~goal))
-  ([goal & goals] `(disjoin (defer ~goal) (disj+ ~@goals))))
-
-(defmacro conj+
-  ([goal] `(defer ~goal))
-  ([goal & goals] `(conjoin (defer ~goal) (conj+ ~@goals))))
-
-(defmacro conde [& goals]
-  `(disj+ ~@(map (fn [goal] `(conj+ ~@goal))
-                 goals)))
-
-(defn call-fresh [lvar->goal]
-  (fn [{:keys [nvar] :as state}]
+(defn call-exist [lvar->goal]
+  (fn [{:keys [nvar] :as unit}]
     ((lvar->goal (lvar nvar))
-     (assoc state :nvar (inc nvar)))))
+     (assoc unit :nvar (inc nvar)))))
 
-(defmacro fresh [vars & goals]
+(defmacro exist
+  {:style/indent 1}
+  [vars & goals]
   (if (empty? vars)
-    `(conj+ ~@goals)
-    `(call-fresh
+    `(& ~@goals)
+    `(call-exist
       (fn [~(first vars)]
-        (fresh [~@(rest vars)]
+        (exist [~@(rest vars)]
           ~@goals)))))
 
 (defn call-goal [goal]
-  (goal initial-state))
+  (goal alpha))
 
 (defmacro run' [vars & goals]
-  `(->> (fresh [~@vars] ~@goals)
+  `(->> (exist [~@vars] ~@goals)
         call-goal
         pull))
 
@@ -272,44 +253,47 @@
 (defmacro run [n vars & goals]
   `(take ~n (run* ~vars ~@goals)))
 
+(def ^:macro % #'exist)
+(def ^:macro ? #'run*)
+
 ;;;;;;;;;;;;;;;;;;;;
 ;; goal utilities ;;
 ;;;;;;;;;;;;;;;;;;;;
 
-(defn appendo [ls rs lsrs]
-  (conde
-   [(=== () ls) (=== rs lsrs)]
-   [(fresh [l s srs]
-      (=== (cons l s) ls)
-      (=== (cons l srs) lsrs)
-      (appendo s rs srs))]))
+(defn =cons [a d ls]
+  (=== (cons a d) ls))
 
-(defn inserto [y xs xys]
-  (fresh [lhs rhs]
-    (appendo lhs rhs xs)
-    (appendo lhs (cons y rhs) xys)))
+(defn =append [ls rs lsrs]
+  (| (& (=== () ls)
+        (=== rs lsrs))
+     (% [l s srs]
+        (=cons l s ls)
+        (=cons l srs lsrs)
+        (=append s rs srs))))
 
-(defn rembero [x ls out]
-  (conde
-   [(=== () ls) (=== () out)]
-   [(fresh [a d]
-      (=== (cons a d) ls)
-      (=== a x)
-      (=== d out))]
-   [(fresh [a d res]
-      (=== (cons a d) ls)
-      (=!= a x)
-      (=== (cons a res) out)
-      (rembero x d res))]))
+(defn =insert [y xs xys]
+  (% [lhs rhs]
+     (=append lhs rhs xs)
+     (=append lhs (cons y rhs) xys)))
+
+(defn =rember [x ls out]
+  (| (& (=== () ls)
+        (=== () out))
+     (% [a d]
+        (=cons a d ls)
+        (=== a x)
+        (=== d out))
+     (% [a d res]
+        (=cons a d ls)
+        (=!= a x)
+        (=cons a res out)
+        (=rember x d res))))
 
 ;; TODO
 ;; - finite domain constraints
 ;; - transparent representation
 ;; - make operators operads
 ;; - reify constraints
-
-
-
 
 (comment
 
@@ -346,7 +330,7 @@
     (let [cells (make-cells hints)
           nines (make-nines cells)]
       (->> (run* [q]
-             (all (map (partial apply unique) nines))
+             (all (map (partial apply =unique) nines))
              (all (keep (fn [cell]
                           (when (lvar? cell)
                             (any (map (partial === cell)
