@@ -54,13 +54,13 @@
 
 ;; Node =
 ;; | cont : () -> Node
-;; | pair : Pair = Unit , Node+
+;; | fork : Fork = Unit+ , Node+
 ;; | unit : Unit
 ;;
 ;; a node in the search tree can be
 ;; - cont, a continuation/thunk which when run may eventually produce a mature node
+;; - fork, a mature node containing a state unit and more successor nodes
 ;; - unit, a mature node representing a success or failure state
-;; - pair, a mature node containing a state unit and more successor nodes
 ;;
 ;; Goal = Desc , Call
 ;; Call = Unit -> Node
@@ -84,26 +84,39 @@
     unit))
 
 (defprotocol Node
-  (bind [this goals])
-  (plus [this nodes])
+  (bind [this goal+])
+  (plus [this node+])
   (pull [this]))
 
 (extend-protocol Node
   clojure.lang.Fn
-  (bind [this goals] #(bind (this) goals))
-  (plus [this nodes] #(plus (this) nodes))
+  (bind [this goal+] #(bind (this) goal+))
+  (plus [this node+]
+
+    #(plus (this) node+)
+
+    )
   (pull [this] (pull (trampoline this))))
 
-(defrecord Pair [unit more]
+(defrecord Fork [units thunks]
   Node
-  (bind [this goals] (plus (bind unit goals) (map #(bind % goals) more)))
-  (plus [this nodes] (Pair. unit (concat more nodes)))
-  (pull [this] (lazy-seq (cons unit (lazy-seq (mapcat pull more))))))
+  (bind [this goal+]
+
+    ;; TODO
+    (plus (bind unit goal+) (map (fn [node] #(bind node goal+)) nodes))
+
+    )
+  (plus [this node+]
+
+    ;; sort node+ into units or thunks
+
+    )
+  (pull [this] (concat units (lazy-seq (mapcat pull thunks)))))
 
 (defrecord Unit [alive smap cg dg]
   Node
-  (bind [this goals] (reduce exec this goals))
-  (plus [this nodes] (Pair. this nodes))
+  (bind [this goal+] (reduce exec this goal+))
+  (plus [this node+] (plus (Fork. [unit] []) node+))
   (pull [this] (list this)))
 
 (def alpha (Unit. true {} :init []))
@@ -143,6 +156,7 @@
    (Goal.
     (cons '| (map :desc (cons g gs)))
     (fn [unit]
+      ;; magic happens here
       (plus (exec unit g)
             (map (partial exec unit)
                  gs))))))
