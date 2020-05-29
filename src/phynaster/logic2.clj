@@ -70,56 +70,92 @@
 ;; plus : Node , Node+ -> Node
 ;; pull : Node -> LazySeq Unit
 
-(defrecord Goal [desc call])
+(defprotocol IBind1 (bind1 [this goal]))
 
-(defn exec [{:as unit :keys [smap cg dg alive]}
-            {:as goal :keys [desc call]}]
-  (if alive
-    (let [unit (assoc unit
-                      :dg (conj dg cg)
-                      :cg desc)]
-      (if-let [unit (call unit)]
-        unit
-        (assoc unit :alive false)))
-    unit))
+(defprotocol IBind (bind [this goal+]))
+(defprotocol IPlus (plus [this that+]))
+(defprotocol IExec (exec [this]))
+(defprotocol IPull (pull [this]))
 
-(defprotocol Node
-  (bind [this goal+])
-  (plus [this node+])
-  (pull [this]))
+;; bind : Thunk , Goal+ -> Thunk
+;; bind : State , Goal+ -> Board
+;; bind : Board , Goal+ -> Board
+;;
+;; plus : Thunk , ????+ -> Thunk
+;; plus : State , ????+ -> Board
+;; plus : Board , Board+ -> Board
+;;
+;; exec : Board -> Board
+;; exec : Thunk -> Thunk | Board
+;;
+;;
 
-(extend-protocol Node
-  clojure.lang.Fn
+(defn -bind [goal+] (fn [this] (bind this goal+)))
+
+(defrecord Board [thunks states graves]
+  IBind
+  (bind [this goal+]
+    (plus (assoc this
+                 :thunks (mapv (-bind goal+) thunks)
+                 :states [])
+          (map (-bind goal+) states)))
+  (IPlus [this that+]
+    (Board. (into thunks (mapcat :thunks that+))
+            (into states (mapcat :states that+))
+            (into graves (mapcat :graves that+))))
+  IExec
+  (exec [this]
+    (let [[thunk & thunks] thunks
+          this (assoc this :thunks (vec thunks))
+          that (exec thunk)]
+      (if (fn? that)
+        (update this :thunks conj that)
+        (plus this [that]))))
+  IPull
+  (pull [this]
+
+
+
+    (concat units (lazy-seq (mapcat pull thunks))))
+
+
+
+  )
+
+(extend-type clojure.lang.Fn
+  IBind
   (bind [this goal+] #(bind (this) goal+))
-  (plus [this node+]
-
-    #(plus (this) node+)
-
-    )
+  IPlus
+  (plus [this that+] #(plus (this) that+))
+  IExec
+  (exec [this] (this))
+  IPull
   (pull [this] (pull (trampoline this))))
 
-(defrecord Fork [units thunks]
-  Node
-  (bind [this goal+]
-
+(defrecord State [alive smap cg dg]
+  IBind1
+  (bind1 [this {:as goal :keys [desc call]}]
+    (if alive
+      (let [this (assoc this
+                        :dg (conj dg cg)
+                        :cg desc)]
+        (if-let [this (call this)]
+          this
+          (assoc this :alive false)))
+      this))
+  IBind
+  (bind [this goal+] (reduce bind1 this goal+))
+  IPlus
+  (plus [this that+]
     ;; TODO
-    (plus (bind unit goal+) (map (fn [node] #(bind node goal+)) nodes))
-
+    (plus (Fork. [unit] []) that+)
     )
-  (plus [this node+]
+  )
 
-    ;; sort node+ into units or thunks
+(def initial-state (State. true {} :init []))
+(def initial-board (Board. [] [initial-state] []))
 
-    )
-  (pull [this] (concat units (lazy-seq (mapcat pull thunks)))))
-
-(defrecord Unit [alive smap cg dg]
-  Node
-  (bind [this goal+] (reduce exec this goal+))
-  (plus [this node+] (plus (Fork. [unit] []) node+))
-  (pull [this] (list this)))
-
-(def alpha (Unit. true {} :init []))
+(defrecord Goal [desc call])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; goals and constraints ;;
