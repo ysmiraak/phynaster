@@ -19,6 +19,9 @@
 (defn lvar? [u] (and (sequential? u) (= (first u) :lvar)))
 (defn toseq [u] (and (sequential? u) (seq u)))
 
+(def empty-queue clojure.lang.PersistentQueue/EMPTY)
+(defn mapq [f xs] (into empty-queue (map f xs)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; unification rules ;;
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -52,110 +55,107 @@
 ;; inference engine ;;
 ;;;;;;;;;;;;;;;;;;;;;;
 
-;; Node =
-;; | cont : () -> Node
-;; | fork : Fork = Unit+ , Node+
-;; | unit : Unit
+;; Thunk = Goal , State
+;; Goal  = Desc , Cont
+;; Cont  = State -> Board
 ;;
-;; a node in the search tree can be
-;; - cont, a continuation/thunk which when run may eventually produce a mature node
-;; - fork, a mature node containing a state unit and more successor nodes
-;; - unit, a mature node representing a success or failure state
+;; bind : Thunk , Goal -> Thunk
+;; bind : State , Goal -> Board
+;; bind : Board , Goal -> Board
 ;;
-;; Goal = Desc , Call
-;; Call = Unit -> Node
-;; exec : Unit , Goal -> Unit
-;;
-;; bind : Node , Goal+ -> Node
-;; plus : Node , Node+ -> Node
-;; pull : Node -> LazySeq Unit
-
-(defprotocol IBind1 (bind1 [this goal]))
-
-(defprotocol IBind (bind [this goal+]))
-(defprotocol IPlus (plus [this that+]))
-(defprotocol IExec (exec [this]))
-(defprotocol IPull (pull [this]))
-
-;; bind : Thunk , Goal+ -> Thunk
-;; bind : State , Goal+ -> Board
-;; bind : Board , Goal+ -> Board
-;;
-;; plus : Thunk , ????+ -> Thunk
-;; plus : State , ????+ -> Board
 ;; plus : Board , Board+ -> Board
 ;;
+;; pull : Board -> State*
 ;; exec : Board -> Board
-;; exec : Thunk -> Thunk | Board
-;;
-;;
+;; exec : Thunk -> Board
+;; call : Goal -> Thunk -> Thunk
+;; call : Goal -> State -> Board
+;; call : Goal -> Board -> Board
 
-(defn -bind [goal+] (fn [this] (bind this goal+)))
+(defprotocol IBind (bind [this goal]))
+(defprotocol IPlus (plus [this that+]))
+(defprotocol IPull (pull [this]))
+(defprotocol IExec (exec [this]))
+(defprotocol ICall (call [this]))
+(defprotocol IUnit (unit [this]))
 
-(defrecord Board [thunks states graves]
+(defrecord Goal [desc cont]
+  ICall
+  (call [this] (fn [that] (bind that this))))
+
+(defrecord Board [state* thunk*]
   IBind
-  (bind [this goal+]
-    (plus (assoc this
-                 :thunks (mapv (-bind goal+) thunks)
-                 :states [])
-          (map (-bind goal+) states)))
-  (IPlus [this that+]
-    (Board. (into thunks (mapcat :thunks that+))
-            (into states (mapcat :states that+))
-            (into graves (mapcat :graves that+))))
-  IExec
-  (exec [this]
-    (let [[thunk & thunks] thunks
-          this (assoc this :thunks (vec thunks))
-          that (exec thunk)]
-      (if (fn? that)
-        (update this :thunks conj that)
-        (plus this [that]))))
-  IPull
-  (pull [this]
-
-
-
-    (concat units (lazy-seq (mapcat pull thunks))))
-
-
-
-  )
-
-(extend-type clojure.lang.Fn
-  IBind
-  (bind [this goal+] #(bind (this) goal+))
-  IPlus
-  (plus [this that+] #(plus (this) that+))
-  IExec
-  (exec [this] (this))
-  IPull
-  (pull [this] (pull (trampoline this))))
-
-(defrecord State [alive smap cg dg]
-  IBind1
-  (bind1 [this {:as goal :keys [desc call]}]
-    (if alive
-      (let [this (assoc this
-                        :dg (conj dg cg)
-                        :cg desc)]
-        (if-let [this (call this)]
-          this
-          (assoc this :alive false)))
-      this))
-  IBind
-  (bind [this goal+] (reduce bind1 this goal+))
+  (bind [this goal]
+    (let [{state* true graves false} (group-by :alive state*)]
+      (plus (Board. graves (mapq (call goal) thunk*))
+            (map (call goal) state*))))
   IPlus
   (plus [this that+]
-    ;; TODO
-    (plus (Fork. [unit] []) that+)
-    )
-  )
+    (Board. (into state* (mapcat :state* that+))
+            (into thunk* (mapcat :thunk* that+))))
+  IExec
+  (exec [this]
+    (if (seq thunk*)
+      ;; force thunks in cycle, this is where magic happens
+      ;; 0. given a model : Thunk -> Logit
+      ;; 1. assign a logit priority to each thunk
+      ;; 2. exec thunk with the highest priority
+      ;; 3. repeat from 2 til no more thunks
+      ;; 4. update model by the alive likelihood
+      (plus (update this :thunk* pop)
+            [(exec (peek  thunk*))])
+      this))
+  IPull
+  (pull [this]
+    (loop [{:keys [state* thunk*] :as this} this]
+      (cond (seq state*) (concat state* (lazy-seq (pull (update this :state* empty))))
+            (seq thunk*) (recur (exec this))))))
 
-(def initial-state (State. true {} :init []))
-(def initial-board (Board. [] [initial-state] []))
+(declare &)
+(defrecord Thunk [state goal]
+  IBind
+  (bind [this goal'] (Thunk. state (& goal goal')))
+  IExec
+  (exec [this] (bind state goal)))
 
-(defrecord Goal [desc call])
+(defrecord State [alive smap done]
+  IBind
+  (bind [this {:keys [desc cont]}]
+    (if alive
+      (cont (update this :done conj desc))
+      (unit this)))
+  IUnit
+  (unit [this] (Board. [this] empty-queue)))
+
+(def initial-state (State. true {} () 0))
+(def initial-board (unit initial-state))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; conjunction and disjunction ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def g1 (Goal. :t (fn [state] (unit state))))
+(def g0 (Goal. :f (fn [state] (unit (assoc state :alive false)))))
+
+(defn &
+  ([] g1)
+  ([g] g)
+  ([g & gs]
+   (Goal. (list* '& (:desc g) (map :desc gs))
+          (fn [state]
+            (reduce bind (bind state g) gs)))))
+
+(defn |
+  ([] g0)
+  ([g] g)
+  ([g & gs]
+   (let [gs (cons g gs)]
+     (Goal. (cons '| (map :desc gs))
+            (fn [state]
+              (Board. [] (mapq (partial ->Thunk state) gs)))))))
+
+(defn all [gs] (apply & gs))
+(defn any [gs] (apply | gs))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; goals and constraints ;;
@@ -164,49 +164,19 @@
 ;; === : Term , Term -> Goal
 
 (defn === [u v]
-  (Goal.
-   (list '=== u v)
-   (fn [{:keys [smap] :as unit}]
-     (when-let [smap (unify u v smap)]
-       (assoc unit :smap smap)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; conjunction and disjunction ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def g1 (Goal. :t (fn [unit] unit)))
-(def g0 (Goal. :f (fn [unit] (assoc unit :alive false))))
-
-(defn &
-  ([] g1)
-  ([& gs]
-   (Goal.
-    (cons '& (map :desc gs))
-    (fn [unit]
-      (bind unit gs)))))
-
-(defn |
-  ([] g0)
-  ([g] g)
-  ([g & gs]
-   (Goal.
-    (cons '| (map :desc (cons g gs)))
-    (fn [unit]
-      ;; magic happens here
-      (plus (exec unit g)
-            (map (partial exec unit)
-                 gs))))))
-
-(defn all [gs] (apply & gs))
-(defn any [gs] (apply | gs))
+  (Goal. (list '=== u v)
+         (fn [{:as state :keys [smap]}]
+           (unit (if-let [smap (unify u v smap)]
+                   (assoc state :smap smap)
+                   (assoc state :alive false))))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; user interface ;;
 ;;;;;;;;;;;;;;;;;;;;
 
 (defn run
-  ([goal] (run goal alpha))
-  ([goal unit] (pull (exec unit goal))))
+  ([goal] (run goal initial-state))
+  ([goal state] (pull ((:cont goal) state))))
 
 (comment
 
@@ -245,7 +215,8 @@
             (=== 8 8)
             (=== 9 9))
          run
-         (map :cg)
+         (map :done)
+         (map first)
          (map second)))
 
   )
