@@ -19,8 +19,11 @@
 (defn lvar? [u] (and (sequential? u) (= (first u) :lvar)))
 (defn toseq [u] (and (sequential? u) (seq u)))
 
-(def empty-queue clojure.lang.PersistentQueue/EMPTY)
-(defn mapq [f xs] (into empty-queue (map f xs)))
+(defn queue
+  ([] clojure.lang.PersistentQueue/EMPTY)
+  ([x] (conj (queue) x))
+  ([x & xs] (into (queue x) xs)))
+(defn mapq [f xs] (into (queue) (map f xs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; unification rules ;;
@@ -59,100 +62,75 @@
 ;; Goal  = Desc , Cont
 ;; Cont  = State -> Board
 ;;
-;; bind : Thunk , Goal -> Thunk
-;; bind : State , Goal -> Board
-;; bind : Board , Goal -> Board
-;;
 ;; plus : Board , Board+ -> Board
-;;
-;; pull : Board -> State*
-;; exec : Board -> Board
+;; bind : Board , Goal -> Board
+;; bind : State , Goal -> Board
+;; bind : Thunk , Goal -> Thunk
 ;; exec : Thunk -> Board
-;; call : Goal -> Thunk -> Thunk
-;; call : Goal -> State -> Board
-;; call : Goal -> Board -> Board
+;; exec : Board -> Board
 
-(defprotocol IBind (bind [this goal]))
-(defprotocol IPlus (plus [this that+]))
-(defprotocol IPull (pull [this]))
-(defprotocol IExec (exec [this]))
-(defprotocol ICall (call [this]))
-(defprotocol IUnit (unit [this]))
+(defprotocol Bind (bind [this goal]))
+(defprotocol Plus (plus [this that+]))
+(defprotocol Exec (exec [this]))
 
-(defrecord Goal [desc cont]
-  ICall
-  (call [this] (fn [that] (bind that this))))
+(defrecord Goal [desc cont])
+(defn call [goal] (fn [this] (bind this goal)))
 
-(defrecord Board [state* thunk*]
-  IBind
-  (bind [this goal]
-    (let [{state* true graves false} (group-by :alive state*)]
-      (plus (Board. graves (mapq (call goal) thunk*))
-            (map (call goal) state*))))
-  IPlus
-  (plus [this that+]
-    (Board. (into state* (mapcat :state* that+))
-            (into thunk* (mapcat :thunk* that+))))
-  IExec
-  (exec [this]
-    (if (seq thunk*)
-      ;; force thunks in cycle, this is where magic happens
-      ;; 0. given a model : Thunk -> Logit
-      ;; 1. assign a logit priority to each thunk
-      ;; 2. exec thunk with the highest priority
-      ;; 3. repeat from 2 til no more thunks
-      ;; 4. update model by the alive likelihood
-      (plus (update this :thunk* pop)
-            [(exec (peek  thunk*))])
-      this))
-  IPull
-  (pull [this]
-    (loop [{:keys [state* thunk*] :as this} this]
-      (cond (seq state*) (concat state* (lazy-seq (pull (update this :state* empty))))
-            (seq thunk*) (recur (exec this))))))
+(defrecord Board [state* thunk* grave*]
+  Plus (plus [this that+]
+         (Board. (into state* (mapcat :state* that+))
+                 (into thunk* (mapcat :thunk* that+))
+                 (into grave* (mapcat :grave* that+))))
+  Bind (bind [this goal]
+         (plus (Board. [] (mapq (call goal) thunk*) grave*)
+               (map (call goal) state*)))
+  Exec (exec [this]
+         (if (seq thunk*)
+           ;; force thunks in cycle, this is where magic happens
+           ;; 0. given a model : Thunk -> Logit
+           ;; 1. assign a logit priority to each thunk
+           ;; 2. exec thunk with the highest priority
+           ;; 3. repeat from 2 til no more thunks
+           ;; 4. update model by the alive likelihood
+           (plus (update this :thunk* pop)
+                 [(exec (peek  thunk*))])
+           this)))
 
 (declare &)
 (defrecord Thunk [state goal]
-  IBind
-  (bind [this goal'] (Thunk. state (& goal goal')))
-  IExec
-  (exec [this] (bind state goal)))
+  Bind (bind [this goal'] (assoc this :goal (& goal goal')))
+  Exec (exec [this] (bind state goal)))
+(defrecord State [smap done] Bind (bind [this {:keys [desc cont]}] (cont (update this :done conj desc))))
+(defrecord Grave [smap done] Bind (bind [this goal] this))
 
-(defrecord State [alive smap done]
-  IBind
-  (bind [this {:keys [desc cont]}]
-    (if alive
-      (cont (update this :done conj desc))
-      (unit this)))
-  IUnit
-  (unit [this] (Board. [this] empty-queue)))
-
-(def initial-state (State. true {} () 0))
-(def initial-board (unit initial-state))
+(defn zero [state] (Board. [] (queue) [(map->Grave state)]))
+(defn unit [state] (Board. [state] (queue) []))
+(def alpha (State. {} ()))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; conjunction and disjunction ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def g1 (Goal. :t (fn [state] (unit state))))
-(def g0 (Goal. :f (fn [state] (unit (assoc state :alive false)))))
+(defmacro goal-form {:style/indent 1} [desc body]
+  `(Goal. ~desc (~'fn ~'[{:as state :keys [smap done]}] ~body)))
+
+(def g1 (goal-form :t (unit state)))
+(def g0 (goal-form :f (zero state)))
 
 (defn &
   ([] g1)
   ([g] g)
   ([g & gs]
-   (Goal. (list* '& (:desc g) (map :desc gs))
-          (fn [state]
-            (reduce bind (bind state g) gs)))))
+   (goal-form (list* '& (:desc g) (map :desc gs))
+     (reduce bind (bind state g) gs))))
 
 (defn |
   ([] g0)
   ([g] g)
   ([g & gs]
    (let [gs (cons g gs)]
-     (Goal. (cons '| (map :desc gs))
-            (fn [state]
-              (Board. [] (mapq (partial ->Thunk state) gs)))))))
+     (goal-form (cons '| (map :desc gs))
+       (Board. [] (mapq (partial ->Thunk state) gs) [])))))
 
 (defn all [gs] (apply & gs))
 (defn any [gs] (apply | gs))
@@ -164,19 +142,23 @@
 ;; === : Term , Term -> Goal
 
 (defn === [u v]
-  (Goal. (list '=== u v)
-         (fn [{:as state :keys [smap]}]
-           (unit (if-let [smap (unify u v smap)]
-                   (assoc state :smap smap)
-                   (assoc state :alive false))))))
+  (goal-form (list '=== u v)
+    (if-let [smap (unify u v smap)]
+      (unit (assoc state :smap smap))
+      (zero state))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; user interface ;;
 ;;;;;;;;;;;;;;;;;;;;
 
+(defn pull [board]
+  (loop [{:keys [state* thunk*] :as board} board]
+    (cond (seq state*) (concat state* (lazy-seq (pull (update board :state* empty))))
+          (seq thunk*) (recur (exec board)))))
+
 (defn run
-  ([goal] (run goal initial-state))
-  ([goal state] (pull ((:cont goal) state))))
+  ([goal] (run goal alpha))
+  ([goal state] (pull (bind state goal))))
 
 (comment
 
