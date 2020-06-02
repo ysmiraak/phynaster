@@ -1,0 +1,151 @@
+#+TITLE: The road first taken: Optimizing choices in logical inference with neural network
+#+DATE: May 30, 2020
+#+AUTHOR: Kuan Yu
+
+This is a project proposal for my master's thesis in the [[http://www.ling.uni-potsdam.de/cogsys/][Cognitive Systems]] program at the University of Potsdam.
+First draft on May 30, 2020.
+
+* Introduction
+
+symbolic intelligence with connectionist brain
+
+* Background
+
+** Neural guided logical inference
+
+** The miniKanren language
+
+*** Basic examples
+
+#+BEGIN_SRC scheme
+(run* [q] (== 1 q))
+;; (1)
+#+END_SRC
+
+#+BEGIN_SRC scheme
+(run* [q]
+  (conde
+   [(== 0 q)]
+   [(== 1 q)]))
+;; (0 1)
+#+END_SRC
+
+#+BEGIN_SRC scheme
+(define (appendo l s out)
+  (conde
+   [(== '() l) (== s out)]
+   [(fresh [a d res]
+      (== (cons a d) l)
+      (== (cons a res) out)
+      (appendo d s res))]))
+
+(run* [p q] (appendo p q '(1 2 3 4)))
+;; ((() (1 2 3 4))
+;;  ((1) (2 3 4))
+;;  ((1 2) (3 4))
+;;  ((1 2 3) (4))
+;;  ((1 2 3 4) ()))
+#+END_SRC
+
+Here is a faithful albeit non-idiomatic translation in Prolog.
+
+#+BEGIN_SRC prolog
+append(L,S,Out) :- L = [], S = Out.
+append(L,S,Out) :- L = [A|D], Out = [A|Res], append(D,S,Res).
+
+?- append(P,Q,[1,2,3,4]).
+%@ P = [],
+%@ Q = [1, 2, 3, 4] ;
+%@ P = [1],
+%@ Q = [2, 3, 4] ;
+%@ P = [1, 2],
+%@ Q = [3, 4] ;
+%@ P = [1, 2, 3],
+%@ Q = [4] ;
+%@ P = [1, 2, 3, 4],
+%@ Q = [] ;
+%@ false.
+#+END_SRC
+
+#+BEGIN_SRC scheme
+(run* [r] (appendo '(1 2) '(3 4) r))
+;; ((1 2 3 4))
+#+END_SRC
+
+the importance of recursion
+
+#+BEGIN_SRC scheme
+(define (nato n)
+  (conde
+   [(== 'z n)]
+   [(fresh [m]
+      (== (cons 's m) n)
+      (nato m))]))
+
+(run 4 [q] (nato n))
+;; (z (s . z) (s s . z) (s s s . z))
+#+END_SRC
+
+#+BEGIN_SRC scheme
+(define (addo m n o)
+  (conde
+   [(== 'z m) (== n o)]
+   [(fresh [l p]
+      (== (cons 's l) m)
+      (== (cons 's p) o)
+      (addo l n p))]))
+
+(run* [q] (addo '(s . z) '(s . z) q))
+;; ((s s . z))
+#+END_SRC
+
+*** Why miniKanren?
+
+- general recursion \`a la Prolog
+- it's an extensible embedded language, with numerous extensions
+- minimal core (microKanren), easy to implement and extend
+- breath first search instead of depth first search, with one line of change
+
+#+BEGIN_SRC scheme
+(define (bind $ g)
+  (cond
+    ((null? $) mzero)
+    ((procedure? $) (lambda () (bind ($) g)))
+    (else (mplus (g (car $)) (bind (cdr $) g)))))
+#+END_SRC
+
+* Project proposal
+
+** Where magic happens
+
+** Neural network
+
+Data = Const | LVar | List Data
+
+*** Embedding: Data types
+
+**** Constants
+
+**** Varaibles
+
+**** Lists
+
+*** Embedding: Goals
+
+- equality   : [Data] -> Goal
+- inequality : [Data] -> Goal
+- domain     : [Data] -> [LVar] -> Goal
+- conjunction : [Goal] -> Goal
+- disjunction : [Goal] -> Goal
+
+(=== a b c)
+(=!= a b c)
+(domain a b c)
+((domain a b c) p q r)
+(| p q r)
+(& p q r)
+(list* a b c tail)
+
+*** Binary prediction
+
+** Evaluation
