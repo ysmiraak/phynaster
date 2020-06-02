@@ -7,13 +7,9 @@
 ;; x y z : Value
 ;;
 ;; a term is either a logical variable (lvar) or a value.
-;; a lvar is implemented as a vector/list whose head is ::lvar,
+;; a lvar is implemented as a vector/list whose head is :lvar,
 ;; to circumvent the restriction in clojure that sequences must have proper tails,
 ;; so that a lvar could unify with a tail.
-;;
-;; id of type Nat is reserved for exist,
-;; when constructing lvar manually,
-;; one must supply an id of another type.
 
 (defn lvar [id] [:lvar id])
 (defn lvar? [u] (and (sequential? u) (= (first u) :lvar)))
