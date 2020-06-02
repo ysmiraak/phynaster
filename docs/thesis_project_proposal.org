@@ -82,7 +82,7 @@ the importance of recursion
       (== (cons 's m) n)
       (nato m))]))
 
-(run 4 [q] (nato n))
+(run 4 [q] (nato q))
 ;; (z (s . z) (s s . z) (s s s . z))
 #+END_SRC
 
@@ -114,9 +114,92 @@ the importance of recursion
     (else (mplus (g (car $)) (bind (cdr $) g)))))
 #+END_SRC
 
+** Attention network
+
 * Project proposal
 
 ** Where magic happens
+
+We start with an [[https://github.com/ysmiraak/phynaster/blob/9c0e813833ed6bb1c78f89e46e249a4d6ccc9017/src/phynaster/logic2.clj#L85-L92][modified implementation]] of miniKanren.
+Of crucial interests are the following two aspects of modifications.
+
+*** Flattened disjunctives
+
+#+BEGIN_SRC clojure
+(| g1
+   (| (| g4
+         g5)
+      g3)
+   g2)
+#+END_SRC
+
+*** Descriptive goals
+
+We added descriptions to the goals in the form of symbolic expressions,
+which are used by the neural network model for predicting the probability of success.
+
+The symbolic descriptions are constructed inductively as follows.
+
+#+BEGIN_EXAMPLE
+Desc =
+| (ConstraintName Data ...)
+| (& Desc ...)
+| (| Desc ...)
+
+ConstraintName =
+| ==
+| !=
+| domain
+| ...
+
+Data =
+| Constant
+| Variable
+| List
+
+List = (list* Data ... Tail)
+Tail = nil | Variable
+#+END_EXAMPLE
+
+The symbols in the language are from either
+a finite pool of constants,
+a finite pool of variables,
+or a fixed pool of special symbols including constraint names, =&=, =|=, =list*=, and =nil=.
+
+The constants and variables are atomic data.
+Compound data are represented as lists.
+Here we use a special list format =list*=,
+which is a hybrid between =cons= and =list=.
+On one hand,
+the =cons= cell representation (e.g. =(cons a (cons b (cons c nil)))=) results in deeply nested expressions,
+making it slower for the neural network to process,
+and the gradient flow during backpropogation difficult.
+On the other hand,
+the flatten =list= representation (e.g. =(list a b c)=) lacks the ability to have a logical variable sitting as the tail,
+which removes the usefulness of lists for representing partially generated expressions during logical inference.
+Therefore, we adopt a hybrid representation =list*=,
+translating =(cons a (cons b (cons c tail)))= as =(list* a b c tail)=
+where =tail= is either =nil= or a logical variable.
+This method gives us an efficient list representation retaining its inductive structure
+which makes it expressive enough for representating arbitrary algebraic expressions.
+
+A goal description is a symbolic expression whose head is a special symbol representing the goal constructor.
+Goal constructors include constraints (equality ~==~, inequality ~!=~, finite domain =domain=, etc.)
+and connectives (=&= and =|=).
+
+
+zzzz TODO change the example, avoid recursion problem, make one branch fail
+
+As an example, consider the first two leaf nodes in infering =:q= as a natural number,
+namely that =:q= unifies with either ='z= or ='(s z)=.
+Here we use keywords =:p= and =:q= as logical variables,
+and quoted symbols ='s= and ='z= as constants.
+
+#+BEGIN_SRC clojure
+(| (== 'z :q)
+   (& (== (list* 's :p) :q)
+      (== (list* 'z ()) :p)))
+#+END_SRC
 
 ** Neural network
 
@@ -129,6 +212,8 @@ Data = Const | LVar | List Data
 **** Varaibles
 
 **** Lists
+
+the inductive structure of lists make them expressive enough for represent any algebraic expressions
 
 *** Embedding: Goals
 
