@@ -11,7 +11,9 @@
 ;; to circumvent the restriction in clojure that sequences must have proper tails,
 ;; so that a lvar could unify with a tail.
 
-(defn lvar [id] [:lvar id])
+(defn lvar
+  ([] (lvar (. clojure.lang.RT (nextID))))
+  ([id] [:lvar id]))
 (defn lvar? [u] (and (sequential? u) (= (first u) :lvar)))
 (defn toseq [u] (and (sequential? u) (seq u)))
 
@@ -117,6 +119,7 @@
   ([] g1)
   ([g] g)
   ([g & gs]
+   ;; TODO order goals so that disjunctives are always last
    (goal-form (list* '& (:desc g) (map :desc gs))
      (reduce bind (bind state g) gs))))
 
