@@ -47,7 +47,7 @@ symbolic intelligence with connectionist brain
 ;;  ((1 2 3 4) ()))
 #+END_SRC
 
-Here is a faithful albeit non-idiomatic translation in Prolog.
+Here is a faithful albeit non-idiomatic and clumsy translation in Prolog.
 
 #+BEGIN_SRC prolog
 append(L,S,Out) :- L = [], S = Out.
@@ -101,7 +101,7 @@ the importance of recursion
 
 *** Why miniKanren?
 
-- general recursion \`a la Prolog
+- general recursion à la Prolog
 - it's an extensible embedded language, with numerous extensions
 - minimal core (microKanren), easy to implement and extend
 - breath first search instead of depth first search, with one line of change
@@ -141,10 +141,10 @@ which are used by the neural network model for predicting the probability of suc
 The symbolic descriptions are constructed inductively as follows.
 
 #+BEGIN_EXAMPLE
-Desc =
+Description =
 | (ConstraintName Data ...)
-| (& Desc ...)
-| (| Desc ...)
+| (& Description ...)
+| (| Description ...)
 
 ConstraintName =
 | ==
@@ -187,18 +187,94 @@ A goal description is a symbolic expression whose head is a special symbol repre
 Goal constructors include constraints (equality ~==~, inequality ~!=~, finite domain =domain=, etc.)
 and connectives (=&= and =|=).
 
+*** Example
 
-zzzz TODO change the example, avoid recursion problem, make one branch fail
-
-As an example, consider the first two leaf nodes in infering =:q= as a natural number,
-namely that =:q= unifies with either ='z= or ='(s z)=.
-Here we use keywords =:p= and =:q= as logical variables,
-and quoted symbols ='s= and ='z= as constants.
+Here is a sample goal description.
+For readability, we use keywords (=:p=, =:q=, and =:r=) to represent logical variables.
 
 #+BEGIN_SRC clojure
-(| (== 'z :q)
-   (& (== (list* 's :p) :q)
-      (== (list* 'z ()) :p)))
+(& (== (list* 1 :p :r) :q)
+   (| (& (== :r nil)
+         (== :p 2))
+      (== :p 4))
+   (!= (list* 1 2 nil) :q))
+#+END_SRC
+
+This global goal contains one disjunctive with two branches.
+After initialization, the inference board contains two thunks,
+each containing its current local goal with the respective description as follows.
+
+#+BEGIN_SRC clojure
+;; thunk 1
+(& (== :r nil)
+   (== :p 2))
+;; thunk 2
+(== :p 4)
+#+END_SRC
+
+We will run a neural network on the global goal description,
+as well as the local goal descriptions,
+to produce embedded representations in a shared vector space.
+For each thunk,
+the global embedding and the local embedding are then combined in the final output layer to predict its success rate.
+
+A useful neural network should rank thunk 2 higher than thunk 1,
+since thunk 1 will fails due to the inequality constraint,
+but thunk 2 will produce one successful result.
+
+#+BEGIN_SRC clojure
+{:p 4, :q (1 4 . ?0), :r ?0}
+#+END_SRC
+
+Namely,
+=:p= unifies with the constant =4=,
+=:q= unifies with the list =(list* 1 4 :r)=,
+and =:r= remains unbound.
+
+*** Problem: recursive goals
+
+Consider =nato=, a recursively defined goal.
+
+#+BEGIN_SRC scheme
+(define (nato n)
+  (| (== 'z n)
+     (fresh [m]
+       (== (list* 's m) n)
+       (nato m))))
+#+END_SRC
+
+While this goal can be constructed and executed without termination problems,
+due to its recursive part being contained in a thunk,
+the description of this goal, however, is an infinite expression.
+
+#+BEGIN_SRC clojure
+(| (== 'z :n)
+   (& (== (list* 's :n') :n)
+      (| (== 'z :n')
+         (& (== (list* 's :n'') :n')
+            (| (== 'z :n'')
+               (& (== (list* 's :n''') :n'')
+                  ...))))))
+#+END_SRC
+
+We propose an ad hoc treatment to this problem:
+We replace the recusive part of the description with a special expression =(rec Variable ...)=
+where =rec= is a new special symbol.
+
+This way, the goal =(nato :n)= has the following global description.
+
+#+BEGIN_SRC clojure
+(| (== 'z :n)
+   (& (== (list* 's :n') :n)
+      (rec :n')))
+#+END_SRC
+
+And the subgoal =(rec :n')= when dethunked will have the following description.
+
+#+BEGIN_SRC clojure
+(| (== 'z :n')
+   (& (== (list* 's :n'') :n')
+      (rec :n'')))
 #+END_SRC
 
 ** Neural network
