@@ -7,13 +7,19 @@ First draft on May 30, 2020.
 
 * Introduction
 
+TODO
+
 symbolic intelligence with connectionist brain
 
 * Background
 
 ** Neural guided logical inference
 
+TODO
+
 ** The miniKanren language
+
+TODO
 
 *** Basic examples
 
@@ -116,6 +122,8 @@ the importance of recursion
 
 ** Attention network
 
+TODO
+
 * Project proposal
 
 ** Where magic happens
@@ -124,6 +132,8 @@ We start with an [[https://github.com/ysmiraak/phynaster/blob/9c0e813833ed6bb1c7
 Of crucial interests are the following two aspects of modifications.
 
 *** Flattened disjunctives
+
+TODO
 
 #+BEGIN_SRC clojure
 (| g1
@@ -140,6 +150,7 @@ which are used by the neural network model for predicting the probability of suc
 
 The symbolic descriptions are constructed inductively as follows.
 
+<<def-description>>
 #+BEGIN_EXAMPLE
 Description =
 | (ConstraintName Data ...)
@@ -184,10 +195,10 @@ This method gives us an efficient list representation retaining its inductive st
 which makes it expressive enough for representating arbitrary algebraic expressions.
 
 A goal description is a symbolic expression whose head is a special symbol representing the goal constructor.
-Goal constructors include constraints (equality ~==~, inequality ~!=~, finite domain =domain=, etc.)
+Goal constructors include constraints (equality ~==~, disequality ~!=~, finite domain =domain=, etc.)
 and connectives (=&= and =|=).
 
-*** Example
+*** <<sec-example>>Example
 
 Here is a sample goal description.
 For readability, we use keywords (=:p=, =:q=, and =:r=) to represent logical variables.
@@ -219,7 +230,7 @@ For each thunk,
 the global embedding and the local embedding are then combined in the final output layer to predict its success rate.
 
 A useful neural network should rank thunk 2 higher than thunk 1,
-since thunk 1 will fails due to the inequality constraint,
+since thunk 1 will fails due to the disequality constraint,
 but thunk 2 will produce one successful result.
 
 #+BEGIN_SRC clojure
@@ -279,34 +290,53 @@ And the subgoal =(rec :n')= when dethunked will have the following description.
 
 ** Neural network
 
-Data = Const | LVar | List Data
+As mentioned in the [[sec-example][example]] above,
+we will use a neural network to predict the success rate of a thunk based on its global and local goal descriptions.
+Here we first describe a recursive attention network for embedding descriptions,
+and then discuss the training process.
 
-*** Embedding: Data types
+*** Description embedding
 
-**** Constants
+Following the [[def-description][definition of descriptions]] above,
+we propose to embed each sub-expression recursively using one attention network.
 
-**** Varaibles
+We start with a learned embedding matrix for special symbols and atomic data types.
+The embedding matrix consists of three regions,
+respectively for special symbols, constants, and variables.
+The number of special symbols are predetermined by the logical programming language,
+crucially the available types of constraints.
+Although an indefinite number of constants and variables are needed for solving problems of arbitrary complexities,
+we have to sacrifice that flexibility in order to interface with the neural model.
+Luckily, in practice, most problems require only a manageable amount of constants and variables.
+The success rate of a goal should stay invariant under consistent permutations of variables.
+This invariance must be learned to the model (see [[sec-training][training]]).
+Likewise, with the limited types of constraints under consideration (equality, disequality, and finite domain),
+the mapping of constants is permutable as well.
 
-**** Lists
+After the embedding lookup for the aforementioned atomic symbols,
+we use the attention network to embed each compound expression =(expr-0 expr-1 ... expr-N)= recursively.
+The attention network consists of two stages.
+Firstly, self-attention allows each sub-expression to query all other sub-expressions,
+producing \(N+1\) vectors, which are sometimes known as annotations in the literature.
+Secondly, we take the annotation for the head expression =expr-0= to query the annotations for the other sub-expressions,
+producing the final embedding vector for the whole expression.
 
-the inductive structure of lists make them expressive enough for represent any algebraic expressions
+One major characteristic of attention networks in comparison to the alternatives such as recurrent or convolutional networks
+is that they are naturally positional invariant.
+For instance, there is no difference in processing ~(== p q)~ versus ~(== q p)~,
+or =(& f g)= versus =(& g f)=.
+This property is a big advantage since all goal constructors under our consideration are commutative.
+However, for lists, such as =(list* a b c ... tail)=,
+the sequential ordering of sub-expressions are important.
+Here we apply the commonly used sinusoidal position encoding.
 
-*** Embedding: Goals
+*** <<sec-training>>Training
 
-- equality   : [Data] -> Goal
-- inequality : [Data] -> Goal
-- domain     : [Data] -> [LVar] -> Goal
-- conjunction : [Goal] -> Goal
-- disjunction : [Goal] -> Goal
+TODO
 
-(=== a b c)
-(=!= a b c)
-(domain a b c)
-((domain a b c) p q r)
-(| p q r)
-(& p q r)
-(list* a b c tail)
-
-*** Binary prediction
+- exhaustive search vs monte carlo tree search
+- binary prediction
 
 ** Evaluation
+
+TODO
