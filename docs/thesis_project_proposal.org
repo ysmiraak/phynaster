@@ -367,7 +367,19 @@ and adjust our method accordingly.
 
 ** Evaluation
 
-TODO
+The purpose of the neural network model is to assign weights to choices,
+so that the logical inference engine could prioritize branches which are more likely to succeed.
+
+We propose two metrics for evaluation.
+
+1. The number of dead ends (failure states) met before finding the first successful result.
+2. The number of choices made in producing the first successful result.
+
+These two metrics reflect the cost of inference regarding respectively the breadth of search and the depth of search.
+
+We will reserve examples from each problem category,
+and compare the metrics when running inference on them
+with and without the neural network model.
 
 * Timeline planning
 
