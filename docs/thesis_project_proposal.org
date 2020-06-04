@@ -152,24 +152,24 @@ The symbolic descriptions are constructed inductively as follows.
 
 <<def-description>>
 #+BEGIN_EXAMPLE
-Description =
+Description :=
 | (ConstraintName Data ...)
 | (& Description ...)
 | (| Description ...)
 
-ConstraintName =
+ConstraintName :=
 | ==
 | !=
 | domain
 | ...
 
-Data =
+Data :=
 | Constant
 | Variable
 | List
 
-List = (list* Data ... Tail)
-Tail = nil | Variable
+List := (list* Data ... Tail)
+Tail := nil | Variable
 #+END_EXAMPLE
 
 The symbols in the language are from either
@@ -385,7 +385,7 @@ with and without the neural network model.
 
 ** June
 
-- Find adviser.
+- Find adviser and refine project idea.
 - Determine problem datasets.
 - Complete miniKanren implementation.
 - Produce training data.
