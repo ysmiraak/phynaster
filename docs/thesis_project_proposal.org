@@ -332,10 +332,38 @@ Here we apply the commonly used sinusoidal position encoding.
 
 *** <<sec-training>>Training
 
-TODO
+The neural network is trained to predict the success rate of a thunk in a supervised manner.
 
-- exhaustive search vs monte carlo tree search
-- binary prediction
+In the simple case, a thunk when executed either fails or produces a successful state.
+The target for prediction is binary.
+However, when the thunk contains disjunctive goals,
+then more thunks will be produced,
+some of which may fail, and others succeed.
+As long as all the spawned thunks terminate,
+we can still take the success ratio,
+and train the model to minimize binary cross entropy.
+
+In the worst case, the thunk may recursively spawn infinitely many,
+or a finite but intractable number of thunks.
+Then the success rate has to be estimated.
+Techniques from reinforcement learning may be useful here,
+such as Monte Carlo tree search.
+However, we do not expect this to happen for problems under our consideration.
+Note that not all recursive goals produce infinitely spawning thunks,
+since some constraints may fail the recursive branch.
+Problems in practice can usually be described with constraints
+which make the solution space finite,
+and improve the efficiency of search.
+
+One major obstacle in training a recursive model is that the training examples are difficult to batch.
+We propose an experimental method for mini-batching.
+Each batch is produced from just one example,
+but with randomized mappings for constants and variables.
+The model should learn the invariance of mapping permutation,
+and rely on no additional information in the embedding apart from the different identities of constants and variables.
+The effectiveness of this method is up to investigation.
+We will examine the embedding matrix and the attention alignment to analyse what the model learns,
+and adjust our method accordingly.
 
 ** Evaluation
 
