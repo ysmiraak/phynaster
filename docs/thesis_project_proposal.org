@@ -383,4 +383,20 @@ with and without the neural network model.
 
 * Timeline planning
 
-TODO
+** June
+
+- Find adviser.
+- Determine problem datasets.
+- Complete miniKanren implementation.
+- Produce training data.
+- Register thesis.
+
+** July & August
+
+- Train neural network.
+- Evaluation and introspection.
+- Adjustments and further experiments.
+
+** September
+
+- Finish thesis paper.
