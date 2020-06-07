@@ -7,9 +7,33 @@ First draft on May 30, 2020.
 
 * Introduction
 
-TODO
+Logical inference commonly involves a backward search process,
+where we check each rule from which the goal can be derived.
+The plurality of rules creates branches in the search tree,
+and the complexity of leveled branches multiplies.
+When we come to a branching node, we face choices.
+Some choices eventually lead us to successful results,
+and others to dead ends,
+or worse, to infinite loops.
 
-symbolic intelligence with connectionist brain
+If we wish to retrieve all possible results,
+an exhaustive search is unavoidable,
+in which case the choices are irrelevant,
+since all branches must be traversed, preferably in parallel.
+However, in practice, we often need just one successful result which satisfies our goal.
+Moreover, in reality, making a wrong choice has far more severe consequences than the computation cost.
+For the time being, we guide machines with well-defined goals whose results can be simulated,
+but eventually they will have to learn by interacting with the real world.
+
+We propose to augment a general logical inference engine with a neural network responsible for making choices:
+a symbolic intelligence with a connectionist brain.
+This project will be a rudimentary exploration into this idea.
+We will train a neural network in a supervised manner to predict the success rate of choices for prioritization
+in order to reduce the breadth and the depth of the subtree traversed before the first successful result is found.
+
+This project aims at laying a solid and extensible groundwork for the following future research directions.
+- Replacing supervised training with reinforcement learning, so that the program learns to make better choices through interactions.
+- Replacing success rate with more complicated objectives for which the choices are to be optimized.
 
 * Background
 
@@ -184,7 +208,7 @@ which is a hybrid between =cons= and =list=.
 On one hand,
 the =cons= cell representation (e.g. =(cons a (cons b (cons c nil)))=) results in deeply nested expressions,
 making it slower for the neural network to process,
-and the gradient flow during backpropogation difficult.
+and the gradient flow during backpropagation difficult.
 On the other hand,
 the flatten =list= representation (e.g. =(list a b c)=) lacks the ability to have a logical variable sitting as the tail,
 which removes the usefulness of lists for representing partially generated expressions during logical inference.
@@ -192,7 +216,7 @@ Therefore, we adopt a hybrid representation =list*=,
 translating =(cons a (cons b (cons c tail)))= as =(list* a b c tail)=
 where =tail= is either =nil= or a logical variable.
 This method gives us an efficient list representation retaining its inductive structure
-which makes it expressive enough for representating arbitrary algebraic expressions.
+which makes it expressive enough for representing arbitrary algebraic expressions.
 
 A goal description is a symbolic expression whose head is a special symbol representing the goal constructor.
 Goal constructors include constraints (equality ~==~, disequality ~!=~, finite domain =domain=, etc.)
@@ -269,7 +293,7 @@ the description of this goal, however, is an infinite expression.
 #+END_SRC
 
 We propose an ad hoc treatment to this problem:
-We replace the recusive part of the description with a special expression =(rec Variable ...)=
+We replace the recursive part of the description with a special expression =(rec Variable ...)=
 where =rec= is a new special symbol.
 
 This way, the goal =(nato :n)= has the following global description.
