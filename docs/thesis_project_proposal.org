@@ -75,9 +75,9 @@ We discuss the following details in their work from which [[sec-proposal][our pr
 - Their recurrent model was more efficient and performant, but it discarded variable identities.
 - During test time, they used a greedy policy.  Only the best predicted candidate was chosen.
 
-** The miniKanren language
+** The /miniKanren/ language
 
-We would like to use [[http://minikanren.org/][miniKanren]] as the basis of the logic programming system,
+We would like to use [[http://minikanren.org/][/miniKanren/]] as the basis of the logic programming system,
 for the following reasons.
 
 - It is an embedded domain specific language with a [[http://webyrd.net/scheme-2013/papers/HemannMuKanren2013.pdf][minimal core]] which is easy to implement.
@@ -150,8 +150,6 @@ Here we introduce the [[https://github.com/webyrd/miniKanren-with-symbolic-const
 
 - Goal constructors such as =appendo= are functions which return goals.
   They are conventionally named with an =o= at the end.
-- A goal is a function which takes an inference state as input and returns a transformed state.
-  This is only relevant for extending the language.
 
 A literal and clumsy translation of the =appendo= example in /Prolog/ is as follows.
 
@@ -178,14 +176,29 @@ appendo(L,S,Out) :- L = [A|D], Out = [A|Res], appendo(D,S,Res).
 
 * <<sec-proposal>>Project proposal
 
-** Where magic happens
+** Where choice happens
 
-We start with an [[https://github.com/ysmiraak/phynaster/blob/9c0e813833ed6bb1c78f89e46e249a4d6ccc9017/src/phynaster/logic2.clj#L85-L92][modified implementation]] of miniKanren.
-Of crucial interests are the following two aspects of modifications.
+We start with an [[https://github.com/ysmiraak/phynaster/blob/9c0e813833ed6bb1c78f89e46e249a4d6ccc9017/src/phynaster/logic2.clj#L85-L92][modified implementation]] of /miniKanren/.
+Here we first discuss the important aspects of modifications,
+and then give an example for where the neural network comes into play.
 
-*** Flattened disjunctives
+*** State board
+
+In /miniKanren/, a goal is a function which takes an inference state as input and returns a transformed state.
+The transformed state could be one of the following.
+
+- A state, where the goal is satisfied.
+- A thunk, which is a function of no argument, for delaying computation.
+- A pair containing a state and a thunk.
+- A failure.
+
+
+We implement the transformed state as a record of type =Board=
+
 
 TODO
+
+flattened disjunctives
 
 #+BEGIN_SRC clojure
 (| g1
