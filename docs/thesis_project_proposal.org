@@ -178,10 +178,6 @@ the importance of recursion
     (else (mplus (g (car $)) (bind (cdr $) g)))))
 #+END_SRC
 
-** Attention network
-
-TODO
-
 * <<sec-proposal>>Project proposal
 
 ** Where magic happens
@@ -373,7 +369,8 @@ the mapping of constants is permutable as well.
 
 After the embedding lookup for the aforementioned atomic symbols,
 we use the attention network to embed each compound expression =(expr-0 expr-1 ... expr-N)= recursively.
-The attention network consists of two stages.
+We follow the attention mechanism of [[https://arxiv.org/abs/1706.03762][Vaswani et al. (2017)]]
+and apply it in two stages.
 Firstly, self-attention allows each sub-expression to query all other sub-expressions,
 producing \(N+1\) vectors, which are sometimes known as annotations in the literature.
 Secondly, we take the annotation for the head expression =expr-0= to query the annotations for the other sub-expressions,
