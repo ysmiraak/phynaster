@@ -10,7 +10,7 @@ First draft on May 30, 2020.
 Logical inference commonly involves a backward search process,
 where we check each rule from which the goal can be derived.
 The plurality of rules creates branches in the search tree,
-and the complexity of leveled branches multiplies.
+and the complexities of nested branches multiply.
 When we come to a branching node, we face choices.
 Some choices eventually lead us to successful results,
 and others to dead ends,
@@ -44,7 +44,7 @@ where the networks were used for ranking clause selections in the [[https://wwwl
 which significantly reduced the number of proof search steps.
 They experimented with convolutional networks and tree LSTM networks.
 [[https://arxiv.org/abs/1805.07563][Kaliszyk et al. (2018)]] successfully applied reinforcement learning for first-order theorem proving,
-but with tableau calculus for finding refutational proofs.
+using tableau calculus for finding refutational proofs.
 [[https://arxiv.org/abs/1811.00796][Kusumoto et al. (2018)]] trained graph networks with reinforcement learning
 for guiding the construction of proof trees in intuitionistic propositional logic using sequent calculus,
 which outperformed Coq's /tauto/ tactic.
@@ -71,7 +71,7 @@ We discuss the following details in their work from which [[sec-proposal][our pr
   The synthesis engine consisted of a few relational programs (e.g. =evalo=, =lookupo=)
   each containing several candidate branches of constraints.
   The weights of the networks were specialized for each relational program,
-  and the model predicts a distribution over the candidates in that program.
+  and the model predicted a distribution over the candidates in that program.
 - Their recurrent model was more efficient and performant, but it discarded variable identities.
 - During test time, they used a greedy policy.  Only the best predicted candidate was chosen.
 
@@ -92,7 +92,7 @@ for the following reasons.
   By default it performs an interleaving breadth-first search,
   but this behavior can be easily changed to depth-first search or [[http://webyrd.net/scheme-2013/papers/Swords2013.pdf][guided search]].
 
-Here we introduce the [[https://github.com/webyrd/miniKanren-with-symbolic-constraints][canonical /Scheme/ version]] of the language with some basic examples.
+Here we introduce the [[https://github.com/webyrd/miniKanren-with-symbolic-constraints][canonical /Scheme/ version]] of the language with some basic examples followed by explanations.
 
 #+BEGIN_SRC scheme
 (run* [q] (== 1 q))
@@ -113,20 +113,20 @@ Here we introduce the [[https://github.com/webyrd/miniKanren-with-symbolic-const
 #+END_SRC
 
 - The macro =conde= takes a number of goal lists,
-  creates the conjunction of goals within each list,
-  and returns a goal which is their disjunction.
+  creates the conjunctions of goals within each list,
+  and returns the goal of their disjunction.
 
 #+BEGIN_SRC scheme
 (run* [q]
   (fresh [q]
-    (== 1 q)))
-;; (_.0)
+    (== 0 q))
+  (== 1 q))
+;; (1)
 #+END_SRC
 
 - The macro =fresh= has a syntax similar to =run*=,
   but returns a goal with freshly created variables.
   It can be read as the existential quantifier.
-- Symbols like =_.0= and =_.1= are used for representing unbound variables.
 
 #+BEGIN_SRC scheme
 (define (appendo l s out)
@@ -178,7 +178,7 @@ appendo(L,S,Out) :- L = [A|D], Out = [A|Res], appendo(D,S,Res).
 
 ** Where choice happens
 
-We start with an [[https://github.com/ysmiraak/phynaster/blob/9c0e813833ed6bb1c78f89e46e249a4d6ccc9017/src/phynaster/logic2.clj#L85-L92][modified implementation]] of /miniKanren/.
+We start with a [[https://github.com/ysmiraak/phynaster/blob/9c0e813833ed6bb1c78f89e46e249a4d6ccc9017/src/phynaster/logic2.clj#L85-L92][modified implementation]] of /miniKanren/.
 Here we first discuss the important aspects of modifications,
 and then give an example for where the neural network comes into play.
 
@@ -188,23 +188,23 @@ In /miniKanren/, a goal is a function which takes an inference state as input an
 The transformed state could be one of the following.
 
 - A state, where the goal is satisfied.
-- A thunk, which is a function of no argument, when called returns a transformed state.
+- A thunk, which is a function of no argument, and when called returns a transformed state.
 - A pair containing a state and a thunk.
 - A failure.
 
 The two user-interface macros =fresh= and =conde= automatically wraps inner goals in thunks to delay their effects.
-When the results are being pulled (for instance in =run*=),
+When the results are being pulled (for instance by =run*=),
 first the global goal is called on the initial state,
 and then depending on the output,
 further actions are taken.
 If the output is a thunk, it means that no result has been reached yet.
 The thunk is executed to expose the first subgoal to the current state,
-which may result in another thunk if more subgoals are to be called.
+which may spawn another thunk if more subgoals are to be called.
 If the output is a pair, it means that the global goal contains some disjunction of subgoals,
 and that one of the branches has reached a result.
 
 This design, while simple, only allows for binary branching in general, and therefore, binary choices.
-In our implementation, we use a record type =Board= to aggregate transformed states.
+In our implementation, we used a record type =Board= to aggregate transformed states.
 A board consists of three queues.
 
 - A queue of states, which are the fruitful leaf nodes of the search tree.
@@ -215,7 +215,7 @@ If the thunk queue is empty, the search tree is fully explored.
 Otherwise, to advance the search process,
 we pop the first thunk and execute it.
 If the first subgoal in the thunk (namely the current goal) is a disjunctive,
-then more thunks may be created and appended to the thunk queue.
+then more thunks may be spawned and appended to the thunk queue.
 This way, we rotate and explore unfinished branches,
 performing a breadth-first search.
 Had we used a stack for storing thunks,
@@ -353,11 +353,11 @@ the description of this goal, however, is an infinite expression.
 
 #+BEGIN_SRC clojure
 (| (== 'z :n)
-   (& (== (list* 's :n') :n)
-      (| (== 'z :n')
-         (& (== (list* 's :n'') :n')
-            (| (== 'z :n'')
-               (& (== (list* 's :n''') :n'')
+   (& (== (list* 's :n1) :n)
+      (| (== 'z :n1)
+         (& (== (list* 's :n2) :n1)
+            (| (== 'z :n2)
+               (& (== (list* 's :n3) :n2)
                   ...))))))
 #+END_SRC
 
@@ -369,16 +369,16 @@ This way, the goal =(nato :n)= has the following global description.
 
 #+BEGIN_SRC clojure
 (| (== 'z :n)
-   (& (== (list* 's :n') :n)
-      (rec :n')))
+   (& (== (list* 's :n1) :n)
+      (rec :n1)))
 #+END_SRC
 
 And the subgoal =(rec :n')= when dethunked will have the following description.
 
 #+BEGIN_SRC clojure
-(| (== 'z :n')
-   (& (== (list* 's :n'') :n')
-      (rec :n'')))
+(| (== 'z :n1)
+   (& (== (list* 's :n2) :n1)
+      (rec :n2)))
 #+END_SRC
 
 ** Neural network
@@ -411,7 +411,7 @@ we use the attention network to embed each compound expression =(expr-0 expr-1 .
 We follow the attention mechanism of [[https://arxiv.org/abs/1706.03762][Vaswani et al. (2017)]]
 and apply it in two stages.
 Firstly, self-attention allows each sub-expression to query all other sub-expressions,
-producing \(N+1\) vectors, which are sometimes known as annotations in the literature.
+producing \(N+1\) vectors, which are sometimes known as annotations in the neural machine translation literature.
 Secondly, we take the annotation for the head expression =expr-0= to query the annotations for the other sub-expressions,
 producing the final embedding vector for the whole expression.
 
@@ -440,7 +440,7 @@ and train the model to minimize binary cross entropy.
 In the worst case, the thunk may recursively spawn infinitely many,
 or a finite but intractable number of thunks.
 Then the success rate has to be estimated.
-Techniques from reinforcement learning may be useful here,
+Techniques from reinforcement learning can be useful here,
 such as Monte Carlo tree search.
 However, we do not expect this to happen for problems under our consideration.
 Note that not all recursive goals produce infinitely spawning thunks,
@@ -479,18 +479,18 @@ with and without the neural network model.
 
 ** June
 
-- Find adviser and refine project idea.
-- Determine problem datasets.
-- Complete miniKanren implementation.
-- Produce training data.
-- Register thesis.
+- find adviser and refine project idea
+- determine problem datasets
+- complete minikanren implementation
+- produce training data
+- register thesis
 
 ** July & August
 
-- Train neural network.
-- Evaluation and introspection.
-- Adjustments and further experiments.
+- train neural network
+- evaluation and introspection
+- adjustments and further experiments
 
 ** September
 
-- Finish thesis paper.
+- finish thesis paper
