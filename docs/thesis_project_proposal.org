@@ -125,7 +125,7 @@ Here we introduce the [[https://github.com/webyrd/miniKanren-with-symbolic-const
 
 - The macro =fresh= has a syntax similar to =run*=,
   but returns a goal with freshly created variables.
-  It can be read as the existantial quantifier.
+  It can be read as the existential quantifier.
 - Symbols like =_.0= and =_.1= are used for representing unbound variables.
 
 #+BEGIN_SRC scheme
@@ -188,17 +188,41 @@ In /miniKanren/, a goal is a function which takes an inference state as input an
 The transformed state could be one of the following.
 
 - A state, where the goal is satisfied.
-- A thunk, which is a function of no argument, for delaying computation.
+- A thunk, which is a function of no argument, when called returns a transformed state.
 - A pair containing a state and a thunk.
 - A failure.
 
+The two user-interface macros =fresh= and =conde= automatically wraps inner goals in thunks to delay their effects.
+When the results are being pulled (for instance in =run*=),
+first the global goal is called on the initial state,
+and then depending on the output,
+further actions are taken.
+If the output is a thunk, it means that no result has been reached yet.
+The thunk is executed to expose the first subgoal to the current state,
+which may result in another thunk if more subgoals are to be called.
+If the output is a pair, it means that the global goal contains some disjunction of subgoals,
+and that one of the branches has reached a result.
 
-We implement the transformed state as a record of type =Board=
+This design, while simple, only allows for binary branching in general, and therefore, binary choices.
+In our implementation, we use a record type =Board= to aggregate transformed states.
+A board consists of three queues.
 
+- A queue of states, which are the fruitful leaf nodes of the search tree.
+- A queue of thunks, which are the unfinished branches, waiting to be explored.
+- A queue of failed states, which exist only for the purpose of analysis.
 
-TODO
+If the thunk queue is empty, the search tree is fully explored.
+Otherwise, to advance the search process,
+we pop the first thunk and execute it.
+If the first subgoal in the thunk (namely the current goal) is a disjunctive,
+then more thunks may be created and appended to the thunk queue.
+This way, we rotate and explore unfinished branches,
+performing a breadth-first search.
+Had we used a stack for storing thunks,
+then a depth-first search would be performed.
 
-flattened disjunctives
+As an example, the following global goal with five subgoals in a nested disjunctive form
+will expose and explore those subgoals in their indexed order.
 
 #+BEGIN_SRC clojure
 (| g1
@@ -207,6 +231,10 @@ flattened disjunctives
       g3)
    g2)
 #+END_SRC
+
+To prioritize the exploration of difference branches,
+we simply use a priority queue for storing thunks,
+with the priorities assigned by the neural network model.
 
 *** Descriptive goals
 
