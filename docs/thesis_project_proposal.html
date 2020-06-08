@@ -1,0 +1,982 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2020-06-08 Mon 12:37 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The road first taken: Optimizing choices in logical inference with neural network</title>
+<meta name="generator" content="Org mode" />
+<meta name="author" content="Kuan Yu" />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { width: 90%; }
+  /*]]>*/-->
+</style>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2019 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+        displayAlign: "center",
+        displayIndent: "0em",
+
+        "HTML-CSS": { scale: 100,
+                        linebreaks: { automatic: "false" },
+                        webFont: "TeX"
+                       },
+        SVG: {scale: 100,
+              linebreaks: { automatic: "false" },
+              font: "TeX"},
+        NativeMML: {scale: 100},
+        TeX: { equationNumbers: {autoNumber: "AMS"},
+               MultLineWidth: "85%",
+               TagSide: "right",
+               TagIndent: ".8em"
+             }
+});
+</script>
+<script type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS_HTML"></script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">The road first taken: Optimizing choices in logical inference with neural network</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org159a67b">1. Introduction</a></li>
+<li><a href="#org7f7ee5e">2. Background</a>
+<ul>
+<li><a href="#org58e545e">2.1. Neural guided logical inference</a></li>
+<li><a href="#org8dae726">2.2. The <i>miniKanren</i> language</a></li>
+</ul>
+</li>
+<li><a href="#org5bafaae">3. Project proposal</a>
+<ul>
+<li><a href="#org6575310">3.1. Where choice happens</a>
+<ul>
+<li><a href="#org77cddc1">3.1.1. State board</a></li>
+<li><a href="#org21f1bf9">3.1.2. Descriptive goals</a></li>
+<li><a href="#org25e71bd">3.1.3. Example</a></li>
+<li><a href="#orgcb0bf50">3.1.4. Problem: recursive goals</a></li>
+</ul>
+</li>
+<li><a href="#orgd980184">3.2. Neural network</a>
+<ul>
+<li><a href="#org8a7839a">3.2.1. Description embedding</a></li>
+<li><a href="#orgbfa6f8c">3.2.2. Training</a></li>
+</ul>
+</li>
+<li><a href="#orge106d10">3.3. Evaluation</a></li>
+</ul>
+</li>
+<li><a href="#orgb29668a">4. Timeline planning</a>
+<ul>
+<li><a href="#org65181ea">4.1. June</a></li>
+<li><a href="#org2cd319a">4.2. July &amp; August</a></li>
+<li><a href="#org1d3336b">4.3. September</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<p>
+This is a project proposal for my master's thesis in the <a href="http://www.ling.uni-potsdam.de/cogsys/">Cognitive Systems</a> program at the University of Potsdam.
+First draft on May 30, 2020.
+</p>
+
+<div id="outline-container-org159a67b" class="outline-2">
+<h2 id="org159a67b"><span class="section-number-2">1</span> Introduction</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Logical inference commonly involves a backward search process,
+where we check each rule from which the goal can be derived.
+The plurality of rules creates branches in the search tree,
+and the complexities of nested branches multiply.
+When we come to a branching node, we face choices.
+Some choices eventually lead us to successful results,
+and others to dead ends,
+or worse, to infinite loops.
+</p>
+
+<p>
+If we wish to retrieve all possible results,
+an exhaustive search is unavoidable,
+in which case the choices are irrelevant,
+since all branches must be traversed, preferably in parallel.
+However, in practice, we often need just one successful result which satisfies our goal.
+Moreover, in reality, making a wrong choice has far more severe consequences than the computation cost.
+For the time being, we guide machines with well-defined goals whose results can be simulated,
+but eventually they will have to learn by interacting with the real world.
+</p>
+
+<p>
+We propose to augment a general logical inference engine with a neural network responsible for making choices:
+a symbolic intelligence with a connectionist brain.
+This project will be a rudimentary exploration into this idea.
+We will train a neural network in a supervised manner to predict the success rate of choices for prioritization
+in order to reduce the breadth and the depth of the subtree traversed before the first successful result is found.
+</p>
+
+<p>
+This project aims at laying a solid and extensible groundwork for the following future research directions.
+</p>
+<ul class="org-ul">
+<li>Replacing supervised training with reinforcement learning, so that the program learns to make better choices through interactions.</li>
+<li>Replacing success rate with more complicated objectives for which the choices are to be optimized.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org7f7ee5e" class="outline-2">
+<h2 id="org7f7ee5e"><span class="section-number-2">2</span> Background</h2>
+<div class="outline-text-2" id="text-2">
+</div>
+<div id="outline-container-org58e545e" class="outline-3">
+<h3 id="org58e545e"><span class="section-number-3">2.1</span> Neural guided logical inference</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+<a href="https://arxiv.org/abs/1701.06972">Loos et al. (2017)</a> demonstrated the usefulness of deep neural networks for guiding first-order logic proof search,
+where the networks were used for ranking clause selections in the <a href="https://wwwlehre.dhbw-stuttgart.de/~sschulz/E/E.html">E theorem prover</a>,
+which significantly reduced the number of proof search steps.
+They experimented with convolutional networks and tree LSTM networks.
+<a href="https://arxiv.org/abs/1805.07563">Kaliszyk et al. (2018)</a> successfully applied reinforcement learning for first-order theorem proving,
+using tableau calculus for finding refutational proofs.
+<a href="https://arxiv.org/abs/1811.00796">Kusumoto et al. (2018)</a> trained graph networks with reinforcement learning
+for guiding the construction of proof trees in intuitionistic propositional logic using sequent calculus,
+which outperformed Coq's <i>tauto</i> tactic.
+These works have shown the power of neural guidance for logical inference in limited contexts.
+</p>
+
+<p>
+<a href="https://arxiv.org/abs/1805.10872">Manhaeve et al. (2018)</a> introduced <i>DeepProbLog</i>
+which integrated neural predicates, e.g. images, into probabilistic logic programming.
+<a href="https://arxiv.org/abs/1901.04195">Marra et al. (2019)</a> used graph networks in probabilistic graphical models
+with MAP inference for modeling logical reasoning.
+These works explored the integration of probabilistic modeling and logical reasoning.
+The general direction of their approach, however, diverges from ours.
+Our goal is to harness the power of statistical methods
+while retaining the definitive nature of symbolic reasoning.
+</p>
+
+<p>
+Our approach is heavily inspired by <a href="https://arxiv.org/abs/1809.02840">Zhang et al. (2018)</a>
+who showed the benefits of neural guidance for program synthesis.
+They experimented with recurrent LSTM networks and gated graph networks
+for synthesizing <i>Scheme</i> programs using the <i>miniKanren</i> logic programming system.
+The neural networks were trained with supervised curriculum and scheduled sampling
+to predict the ground-truth optimal candidates at each step for expanding the partially synthesized program.
+We discuss the following details in their work from which <a href="#org56be12c">our proposal</a> differs.
+</p>
+
+<ul class="org-ul">
+<li>They used neural networks for embedding constraints which depended on the target synthesis language.
+The synthesis engine consisted of a few relational programs (e.g. <code>evalo</code>, <code>lookupo</code>)
+each containing several candidate branches of constraints.
+The weights of the networks were specialized for each relational program,
+and the model predicted a distribution over the candidates in that program.</li>
+<li>Their recurrent model was more efficient and performant, but it discarded variable identities.</li>
+<li>During test time, they used a greedy policy.  Only the best predicted candidate was chosen.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org8dae726" class="outline-3">
+<h3 id="org8dae726"><span class="section-number-3">2.2</span> The <i>miniKanren</i> language</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+We would like to use <a href="http://minikanren.org/"><i>miniKanren</i></a> as the basis of the logic programming system,
+for the following reasons.
+</p>
+
+<ul class="org-ul">
+<li>It is an embedded domain specific language with a <a href="http://webyrd.net/scheme-2013/papers/HemannMuKanren2013.pdf">minimal core</a> which is easy to implement.
+It has been implemented in over 40 host languages,
+covering almost every common platforms.</li>
+<li>It is a general logic programming system à la <i>Prolog</i>,
+based on unification resolution,
+supporting recursion or whatever the host language has to offer.</li>
+<li>It is an extensible system, with numerous extensions
+such as <a href="http://www.schemeworkshop.org/2011/papers/Alvis2011.pdf">constraint programming</a>, <a href="http://webyrd.net/alphamk/alphamk_workshop.pdf">nominal logic</a>, and <a href="https://github.com/webyrd/probKanren">probabilistic logic programming</a>.</li>
+<li>It has well-understood <a href="http://okmij.org/ftp/papers/LogicT.pdf">computational effects</a>.
+By default it performs an interleaving breadth-first search,
+but this behavior can be easily changed to depth-first search or <a href="http://webyrd.net/scheme-2013/papers/Swords2013.pdf">guided search</a>.</li>
+</ul>
+
+<p>
+Here we introduce the <a href="https://github.com/webyrd/miniKanren-with-symbolic-constraints">canonical <i>Scheme</i> version</a> of the language with some basic examples followed by explanations.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme"><span style="color: #707183;">(</span>run* <span style="color: #7388D6;">[</span>q<span style="color: #7388D6;">]</span> <span style="color: #7388D6;">(</span>== 1 q<span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #8D8D84;">;; </span><span style="color: #8D8D84; font-style: italic;">(1)</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>The macro <code>run*</code> takes a list of query variables and one or more goal expressions,
+and returns the list of all results satisfying the goals.</li>
+<li>The goal constructor <code>==</code> is used for unification.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-scheme"><span style="color: #707183;">(</span>run* <span style="color: #7388D6;">[</span>p q<span style="color: #7388D6;">]</span>
+  <span style="color: #7388D6;">(</span>conde
+   <span style="color: #909183;">[</span><span style="color: #709870;">(</span>== 0 p<span style="color: #709870;">)</span> <span style="color: #709870;">(</span>== 0 q<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+   <span style="color: #909183;">[</span><span style="color: #709870;">(</span>== 1 q<span style="color: #709870;">)</span> <span style="color: #709870;">(</span>== 2 q<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+   <span style="color: #909183;">[</span><span style="color: #709870;">(</span>== 3 p<span style="color: #709870;">)</span> <span style="color: #709870;">(</span>== 3 q<span style="color: #709870;">)</span><span style="color: #909183;">]</span><span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #8D8D84;">;; </span><span style="color: #8D8D84; font-style: italic;">((0 0) (3 3))</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>The macro <code>conde</code> takes a number of goal lists,
+creates the conjunctions of goals within each list,
+and returns the goal of their disjunction.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-scheme"><span style="color: #707183;">(</span>run* <span style="color: #7388D6;">[</span>q<span style="color: #7388D6;">]</span>
+  <span style="color: #7388D6;">(</span>fresh <span style="color: #909183;">[</span>q<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>== 0 q<span style="color: #909183;">)</span><span style="color: #7388D6;">)</span>
+  <span style="color: #7388D6;">(</span>== 1 q<span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #8D8D84;">;; </span><span style="color: #8D8D84; font-style: italic;">(1)</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>The macro <code>fresh</code> has a syntax similar to <code>run*</code>,
+but returns a goal with freshly created variables.
+It can be read as the existential quantifier.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-scheme"><span style="color: #707183;">(</span><span style="color: #0000FF;">define</span> <span style="color: #7388D6;">(</span><span style="color: #006699;">appendo</span> l s out<span style="color: #7388D6;">)</span>
+  <span style="color: #7388D6;">(</span>conde
+   <span style="color: #909183;">[</span><span style="color: #709870;">(</span>== '<span style="color: #907373;">()</span> l<span style="color: #709870;">)</span> <span style="color: #709870;">(</span>== s out<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+   <span style="color: #909183;">[</span><span style="color: #709870;">(</span>fresh <span style="color: #907373;">[</span>a d res<span style="color: #907373;">]</span>
+      <span style="color: #907373;">(</span>== <span style="color: #6276BA;">(</span>cons a d<span style="color: #6276BA;">)</span> l<span style="color: #907373;">)</span>
+      <span style="color: #907373;">(</span>== <span style="color: #6276BA;">(</span>cons a res<span style="color: #6276BA;">)</span> out<span style="color: #907373;">)</span>
+      <span style="color: #907373;">(</span>appendo d s res<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span><span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span>run* <span style="color: #7388D6;">[</span>r<span style="color: #7388D6;">]</span> <span style="color: #7388D6;">(</span>appendo '<span style="color: #909183;">(</span>1 2<span style="color: #909183;">)</span> '<span style="color: #909183;">(</span>3 4<span style="color: #909183;">)</span> r<span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #8D8D84;">;; </span><span style="color: #8D8D84; font-style: italic;">((1 2 3 4))</span>
+
+<span style="color: #707183;">(</span>run* <span style="color: #7388D6;">[</span>p q<span style="color: #7388D6;">]</span> <span style="color: #7388D6;">(</span>appendo p q '<span style="color: #909183;">(</span>1 2 3 4<span style="color: #909183;">)</span><span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #8D8D84;">;; </span><span style="color: #8D8D84; font-style: italic;">((() (1 2 3 4))</span>
+<span style="color: #8D8D84;">;;  </span><span style="color: #8D8D84; font-style: italic;">((1) (2 3 4))</span>
+<span style="color: #8D8D84;">;;  </span><span style="color: #8D8D84; font-style: italic;">((1 2) (3 4))</span>
+<span style="color: #8D8D84;">;;  </span><span style="color: #8D8D84; font-style: italic;">((1 2 3) (4))</span>
+<span style="color: #8D8D84;">;;  </span><span style="color: #8D8D84; font-style: italic;">((1 2 3 4) ()))</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>Goal constructors such as <code>appendo</code> are functions which return goals.
+They are conventionally named with an <code>o</code> at the end.</li>
+</ul>
+
+<p>
+A literal and clumsy translation of the <code>appendo</code> example in <i>Prolog</i> is as follows.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-prolog"><span style="color: #006699;">appendo</span><span style="color: #707183;">(</span><span style="color: #BA36A5;">L</span>,<span style="color: #BA36A5;">S</span>,<span style="color: #BA36A5;">Out</span><span style="color: #707183;">)</span> :- <span style="color: #BA36A5;">L</span> = <span style="color: #707183;">[]</span>, <span style="color: #BA36A5;">S</span> = <span style="color: #BA36A5;">Out</span>.
+<span style="color: #006699;">appendo</span><span style="color: #707183;">(</span><span style="color: #BA36A5;">L</span>,<span style="color: #BA36A5;">S</span>,<span style="color: #BA36A5;">Out</span><span style="color: #707183;">)</span> :- <span style="color: #BA36A5;">L</span> = <span style="color: #707183;">[</span><span style="color: #BA36A5;">A</span><span style="color: #0000FF;">|</span><span style="color: #BA36A5;">D</span><span style="color: #707183;">]</span>, <span style="color: #BA36A5;">Out</span> = <span style="color: #707183;">[</span><span style="color: #BA36A5;">A</span><span style="color: #0000FF;">|</span><span style="color: #BA36A5;">Res</span><span style="color: #707183;">]</span>, appendo<span style="color: #707183;">(</span><span style="color: #BA36A5;">D</span>,<span style="color: #BA36A5;">S</span>,<span style="color: #BA36A5;">Res</span><span style="color: #707183;">)</span>.
+
+?- appendo<span style="color: #707183;">(</span><span style="color: #7388D6;">[</span>1,2<span style="color: #7388D6;">]</span>,<span style="color: #7388D6;">[</span>3,4<span style="color: #7388D6;">]</span>,<span style="color: #BA36A5;">R</span><span style="color: #707183;">)</span>.
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ R = [1, 2, 3, 4].</span>
+
+?- appendo<span style="color: #707183;">(</span><span style="color: #BA36A5;">P</span>,<span style="color: #BA36A5;">Q</span>,<span style="color: #7388D6;">[</span>1,2,3,4<span style="color: #7388D6;">]</span><span style="color: #707183;">)</span>.
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ P = [],</span>
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ Q = [1, 2, 3, 4] ;</span>
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ P = [1],</span>
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ Q = [2, 3, 4] ;</span>
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ P = [1, 2],</span>
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ Q = [3, 4] ;</span>
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ P = [1, 2, 3],</span>
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ Q = [4] ;</span>
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ P = [1, 2, 3, 4],</span>
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ Q = [] ;</span>
+<span style="color: #8D8D84;">%</span><span style="color: #8D8D84; font-style: italic;">@ false.</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org5bafaae" class="outline-2">
+<h2 id="org5bafaae"><span class="section-number-2">3</span> <a id="org56be12c"></a>Project proposal</h2>
+<div class="outline-text-2" id="text-3">
+</div>
+<div id="outline-container-org6575310" class="outline-3">
+<h3 id="org6575310"><span class="section-number-3">3.1</span> Where choice happens</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+We start with a <a href="https://github.com/ysmiraak/phynaster/blob/9c0e813833ed6bb1c78f89e46e249a4d6ccc9017/src/phynaster/logic2.clj#L85-L92">modified implementation</a> of <i>miniKanren</i>.
+Here we first discuss the important aspects of modifications,
+and then give an example for where the neural network comes into play.
+</p>
+</div>
+
+<div id="outline-container-org77cddc1" class="outline-4">
+<h4 id="org77cddc1"><span class="section-number-4">3.1.1</span> State board</h4>
+<div class="outline-text-4" id="text-3-1-1">
+<p>
+In <i>miniKanren</i>, a goal is a function which takes an inference state as input and returns a transformed state.
+The transformed state could be one of the following.
+</p>
+
+<ul class="org-ul">
+<li>A state, where the goal is satisfied.</li>
+<li>A thunk, which is a function of no argument, and when called returns a transformed state.</li>
+<li>A pair containing a state and a thunk.</li>
+<li>A failure.</li>
+</ul>
+
+<p>
+The two user-interface macros <code>fresh</code> and <code>conde</code> automatically wraps inner goals in thunks to delay their effects.
+When the results are being pulled (for instance by <code>run*</code>),
+first the global goal is called on the initial state,
+and then depending on the output,
+further actions are taken.
+If the output is a thunk, it means that no result has been reached yet.
+The thunk is executed to expose the first subgoal to the current state,
+which may spawn another thunk if more subgoals are to be called.
+If the output is a pair, it means that the global goal contains some disjunction of subgoals,
+and that one of the branches has reached a result.
+</p>
+
+<p>
+This design, while simple, only allows for binary branching in general, and therefore, binary choices.
+In our implementation, we used a record type <code>Board</code> to aggregate transformed states.
+A board consists of three queues.
+</p>
+
+<ul class="org-ul">
+<li>A queue of states, which are the fruitful leaf nodes of the search tree.</li>
+<li>A queue of thunks, which are the unfinished branches, waiting to be explored.</li>
+<li>A queue of failed states, which exist only for the purpose of analysis.</li>
+</ul>
+
+<p>
+If the thunk queue is empty, the search tree is fully explored.
+Otherwise, to advance the search process,
+we pop the first thunk and execute it.
+If the first subgoal in the thunk (namely the current goal) is a disjunctive,
+then more thunks may be spawned and appended to the thunk queue.
+This way, we rotate and explore unfinished branches,
+performing a breadth-first search.
+Had we used a stack for storing thunks,
+then a depth-first search would be performed.
+</p>
+
+<p>
+As an example, the following global goal with five subgoals in a nested disjunctive form
+will expose and explore those subgoals in their indexed order.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>| g1
+   <span style="color: #7388D6;">(</span>| <span style="color: #909183;">(</span>| g4
+         g5<span style="color: #909183;">)</span>
+      g3<span style="color: #7388D6;">)</span>
+   g2<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+To prioritize the exploration of difference branches,
+we simply use a priority queue for storing thunks,
+with the priorities assigned by the neural network model.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org21f1bf9" class="outline-4">
+<h4 id="org21f1bf9"><span class="section-number-4">3.1.2</span> Descriptive goals</h4>
+<div class="outline-text-4" id="text-3-1-2">
+<p>
+We added descriptions to the goals in the form of symbolic expressions,
+which are used by the neural network model for predicting the probability of success.
+</p>
+
+<p>
+The symbolic descriptions are constructed inductively as follows.
+</p>
+
+<p>
+<a id="orge9f5510"></a>
+</p>
+<pre class="example">
+Description :=
+| (ConstraintName Data ...)
+| (&amp; Description ...)
+| (| Description ...)
+
+ConstraintName :=
+| ==
+| !=
+| domain
+| ...
+
+Data :=
+| Constant
+| Variable
+| List
+
+List := (list* Data ... Tail)
+Tail := nil | Variable
+</pre>
+
+<p>
+The symbols in the language are from either
+a finite pool of constants,
+a finite pool of variables,
+or a fixed pool of special symbols including constraint names, <code>&amp;</code>, <code>|</code>, <code>list*</code>, and <code>nil</code>.
+</p>
+
+<p>
+The constants and variables are atomic data.
+Compound data are represented as lists.
+Here we use a special list format <code>list*</code>,
+which is a hybrid between <code>cons</code> and <code>list</code>.
+On one hand,
+the <code>cons</code> cell representation (e.g. <code>(cons a (cons b (cons c nil)))</code>) results in deeply nested expressions,
+making it slower for the neural network to process,
+and the gradient flow during backpropagation difficult.
+On the other hand,
+the flatten <code>list</code> representation (e.g. <code>(list a b c)</code>) lacks the ability to have a logical variable sitting as the tail,
+which removes the usefulness of lists for representing partially generated expressions during logical inference.
+Therefore, we adopt a hybrid representation <code>list*</code>,
+translating <code>(cons a (cons b (cons c tail)))</code> as <code>(list* a b c tail)</code>
+where <code>tail</code> is either <code>nil</code> or a logical variable.
+This method gives us an efficient list representation retaining its inductive structure
+which makes it expressive enough for representing arbitrary algebraic expressions.
+</p>
+
+<p>
+A goal description is a symbolic expression whose head is a special symbol representing the goal constructor.
+Goal constructors include constraints (equality <code>==</code>, disequality <code>!=</code>, finite domain <code>domain</code>, etc.)
+and connectives (<code>&amp;</code> and <code>|</code>).
+</p>
+</div>
+</div>
+
+<div id="outline-container-org25e71bd" class="outline-4">
+<h4 id="org25e71bd"><span class="section-number-4">3.1.3</span> <a id="org72050bb"></a>Example</h4>
+<div class="outline-text-4" id="text-3-1-3">
+<p>
+Here is a sample goal description.
+For readability, we use keywords (<code>:p</code>, <code>:q</code>, and <code>:r</code>) to represent logical variables.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>&amp; <span style="color: #7388D6;">(</span>== <span style="color: #909183;">(</span>list* 1 <span style="color: #D0372D;">:p</span> <span style="color: #D0372D;">:r</span><span style="color: #909183;">)</span> <span style="color: #D0372D;">:q</span><span style="color: #7388D6;">)</span>
+   <span style="color: #7388D6;">(</span>| <span style="color: #909183;">(</span>&amp; <span style="color: #709870;">(</span>== <span style="color: #D0372D;">:r</span> <span style="color: #D0372D;">nil</span><span style="color: #709870;">)</span>
+         <span style="color: #709870;">(</span>== <span style="color: #D0372D;">:p</span> 2<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+      <span style="color: #909183;">(</span>== <span style="color: #D0372D;">:p</span> 4<span style="color: #909183;">)</span><span style="color: #7388D6;">)</span>
+   <span style="color: #7388D6;">(</span>!= <span style="color: #909183;">(</span>list* 1 2 <span style="color: #D0372D;">nil</span><span style="color: #909183;">)</span> <span style="color: #D0372D;">:q</span><span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+This global goal contains one disjunctive with two branches.
+After initialization, the inference board contains two thunks,
+each containing its current local goal with the respective description as follows.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8D8D84;">;; </span><span style="color: #8D8D84; font-style: italic;">thunk 1</span>
+<span style="color: #707183;">(</span>&amp; <span style="color: #7388D6;">(</span>== <span style="color: #D0372D;">:r</span> <span style="color: #D0372D;">nil</span><span style="color: #7388D6;">)</span>
+   <span style="color: #7388D6;">(</span>== <span style="color: #D0372D;">:p</span> 2<span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #8D8D84;">;; </span><span style="color: #8D8D84; font-style: italic;">thunk 2</span>
+<span style="color: #707183;">(</span>== <span style="color: #D0372D;">:p</span> 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We will run a neural network on the global goal description,
+as well as the local goal descriptions,
+to produce embedded representations in a shared vector space.
+For each thunk,
+the global embedding and the local embedding are then combined in the final output layer to predict its success rate.
+</p>
+
+<p>
+A useful neural network should rank thunk 2 higher than thunk 1,
+since thunk 1 will fails due to the disequality constraint,
+but thunk 2 will produce one successful result.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">{</span><span style="color: #D0372D;">:p</span> 4, <span style="color: #D0372D;">:q</span> <span style="color: #7388D6;">(</span>1 4 . ?0<span style="color: #7388D6;">)</span>, <span style="color: #D0372D;">:r</span> ?0<span style="color: #707183;">}</span>
+</pre>
+</div>
+
+<p>
+Namely,
+<code>:p</code> unifies with the constant <code>4</code>,
+<code>:q</code> unifies with the list <code>(list* 1 4 :r)</code>,
+and <code>:r</code> remains unbound.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgcb0bf50" class="outline-4">
+<h4 id="orgcb0bf50"><span class="section-number-4">3.1.4</span> Problem: recursive goals</h4>
+<div class="outline-text-4" id="text-3-1-4">
+<p>
+Consider <code>nato</code>, a recursively defined goal.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme"><span style="color: #707183;">(</span><span style="color: #0000FF;">define</span> <span style="color: #7388D6;">(</span><span style="color: #006699;">nato</span> n<span style="color: #7388D6;">)</span>
+  <span style="color: #7388D6;">(</span><span style="color: #008000;">| (== 'z n)</span>
+<span style="color: #008000;">     (fresh [m]</span>
+<span style="color: #008000;">       (== (list* 's m) n)</span>
+<span style="color: #008000;">       (nato m))))</span>
+</pre>
+</div>
+
+<p>
+While this goal can be constructed and executed without termination problems,
+due to its recursive part being contained in a thunk,
+the description of this goal, however, is an infinite expression.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>| <span style="color: #7388D6;">(</span>== 'z <span style="color: #D0372D;">:n</span><span style="color: #7388D6;">)</span>
+   <span style="color: #7388D6;">(</span>&amp; <span style="color: #909183;">(</span>== <span style="color: #709870;">(</span>list* 's <span style="color: #D0372D;">:n1</span><span style="color: #709870;">)</span> <span style="color: #D0372D;">:n</span><span style="color: #909183;">)</span>
+      <span style="color: #909183;">(</span>| <span style="color: #709870;">(</span>== 'z <span style="color: #D0372D;">:n1</span><span style="color: #709870;">)</span>
+         <span style="color: #709870;">(</span>&amp; <span style="color: #907373;">(</span>== <span style="color: #6276BA;">(</span>list* 's <span style="color: #D0372D;">:n2</span><span style="color: #6276BA;">)</span> <span style="color: #D0372D;">:n1</span><span style="color: #907373;">)</span>
+            <span style="color: #907373;">(</span>| <span style="color: #6276BA;">(</span>== 'z <span style="color: #D0372D;">:n2</span><span style="color: #6276BA;">)</span>
+               <span style="color: #6276BA;">(</span>&amp; <span style="color: #858580;">(</span>== <span style="color: #80A880;">(</span>list* 's <span style="color: #D0372D;">:n3</span><span style="color: #80A880;">)</span> <span style="color: #D0372D;">:n2</span><span style="color: #858580;">)</span>
+                  ...<span style="color: #6276BA;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We propose an ad hoc treatment to this problem:
+We replace the recursive part of the description with a special expression <code>(rec Variable ...)</code>
+where <code>rec</code> is a new special symbol.
+</p>
+
+<p>
+This way, the goal <code>(nato :n)</code> has the following global description.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>| <span style="color: #7388D6;">(</span>== 'z <span style="color: #D0372D;">:n</span><span style="color: #7388D6;">)</span>
+   <span style="color: #7388D6;">(</span>&amp; <span style="color: #909183;">(</span>== <span style="color: #709870;">(</span>list* 's <span style="color: #D0372D;">:n1</span><span style="color: #709870;">)</span> <span style="color: #D0372D;">:n</span><span style="color: #909183;">)</span>
+      <span style="color: #909183;">(</span>rec <span style="color: #D0372D;">:n1</span><span style="color: #909183;">)</span><span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+And the subgoal <code>(rec :n')</code> when dethunked will have the following description.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>| <span style="color: #7388D6;">(</span>== 'z <span style="color: #D0372D;">:n1</span><span style="color: #7388D6;">)</span>
+   <span style="color: #7388D6;">(</span>&amp; <span style="color: #909183;">(</span>== <span style="color: #709870;">(</span>list* 's <span style="color: #D0372D;">:n2</span><span style="color: #709870;">)</span> <span style="color: #D0372D;">:n1</span><span style="color: #909183;">)</span>
+      <span style="color: #909183;">(</span>rec <span style="color: #D0372D;">:n2</span><span style="color: #909183;">)</span><span style="color: #7388D6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgd980184" class="outline-3">
+<h3 id="orgd980184"><span class="section-number-3">3.2</span> Neural network</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+As mentioned in the <a href="#org72050bb">example</a> above,
+we will use a neural network to predict the success rate of a thunk based on its global and local goal descriptions.
+Here we first describe a recursive attention network for embedding descriptions,
+and then discuss the training process.
+</p>
+</div>
+
+<div id="outline-container-org8a7839a" class="outline-4">
+<h4 id="org8a7839a"><span class="section-number-4">3.2.1</span> Description embedding</h4>
+<div class="outline-text-4" id="text-3-2-1">
+<p>
+Following the <a href="#orge9f5510">definition of descriptions</a> above,
+we propose to embed each sub-expression recursively using one attention network.
+</p>
+
+<p>
+We start with a learned embedding matrix for special symbols and atomic data types.
+The embedding matrix consists of three regions,
+respectively for special symbols, constants, and variables.
+The number of special symbols are predetermined by the logic programming language,
+crucially the available types of constraints.
+Although an indefinite number of constants and variables are needed for solving problems of arbitrary complexities,
+we have to sacrifice that flexibility in order to interface with the neural model.
+Luckily, in practice, most problems require only a manageable amount of constants and variables.
+The success rate of a goal should stay invariant under consistent permutations of variables.
+This invariance must be learned to the model (see <a href="#orga2f0882">training</a>).
+Likewise, with the limited types of constraints under consideration (equality, disequality, and finite domain),
+the mapping of constants is permutable as well.
+</p>
+
+<p>
+After the embedding lookup for the aforementioned atomic symbols,
+we use the attention network to embed each compound expression <code>(expr-0 expr-1 ... expr-N)</code> recursively.
+We follow the attention mechanism of <a href="https://arxiv.org/abs/1706.03762">Vaswani et al. (2017)</a>
+and apply it in two stages.
+Firstly, self-attention allows each sub-expression to query all other sub-expressions,
+producing \(N+1\) vectors, which are sometimes known as annotations in the neural machine translation literature.
+Secondly, we take the annotation for the head expression <code>expr-0</code> to query the annotations for the other sub-expressions,
+producing the final embedding vector for the whole expression.
+</p>
+
+<p>
+One major characteristic of attention networks in comparison to the alternatives such as recurrent or convolutional networks
+is that they are naturally positional invariant.
+For instance, there is no difference in processing <code>(== p q)</code> versus <code>(== q p)</code>,
+or <code>(&amp; f g)</code> versus <code>(&amp; g f)</code>.
+This property is a big advantage since all goal constructors under our consideration are commutative.
+However, for lists, such as <code>(list* a b c ... tail)</code>,
+the sequential ordering of sub-expressions are important.
+Here we apply the commonly used sinusoidal position encoding.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbfa6f8c" class="outline-4">
+<h4 id="orgbfa6f8c"><span class="section-number-4">3.2.2</span> <a id="orga2f0882"></a>Training</h4>
+<div class="outline-text-4" id="text-3-2-2">
+<p>
+The neural network is trained to predict the success rate of a thunk in a supervised manner.
+</p>
+
+<p>
+In the simple case, a thunk when executed either fails or produces a successful state.
+The target for prediction is binary.
+However, when the thunk contains disjunctive goals,
+then more thunks will be produced,
+some of which may fail, and others succeed.
+As long as all the spawned thunks terminate,
+we can still take the success ratio,
+and train the model to minimize binary cross entropy.
+</p>
+
+<p>
+In the worst case, the thunk may recursively spawn infinitely many,
+or a finite but intractable number of thunks.
+Then the success rate has to be estimated.
+Techniques from reinforcement learning can be useful here,
+such as Monte Carlo tree search.
+However, we do not expect this to happen for problems under our consideration.
+Note that not all recursive goals produce infinitely spawning thunks,
+since some constraints may fail the recursive branch.
+Problems in practice can usually be described with constraints
+which make the solution space finite,
+and improve the efficiency of search.
+</p>
+
+<p>
+One major obstacle in training a recursive model is that the training examples are difficult to batch.
+We propose an experimental method for mini-batching.
+Each batch is produced from just one example,
+but with randomized mappings for constants and variables.
+The model should learn the invariance of mapping permutation,
+and rely on no additional information in the embedding apart from the different identities of constants and variables.
+The effectiveness of this method is up to investigation.
+We will examine the embedding matrix and the attention alignment to analyse what the model learns,
+and adjust our method accordingly.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge106d10" class="outline-3">
+<h3 id="orge106d10"><span class="section-number-3">3.3</span> Evaluation</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+The purpose of the neural network model is to assign weights to choices,
+so that the logical inference engine could prioritize branches which are more likely to succeed.
+</p>
+
+<p>
+We propose two metrics for evaluation.
+</p>
+
+<ol class="org-ol">
+<li>The number of dead ends (failure states) met before finding the first successful result.</li>
+<li>The number of choices made in producing the first successful result.</li>
+</ol>
+
+<p>
+These two metrics reflect the cost of inference regarding respectively the breadth of search and the depth of search.
+</p>
+
+<p>
+We will reserve examples from each problem category,
+and compare the metrics when running inference on them
+with and without the neural network model.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb29668a" class="outline-2">
+<h2 id="orgb29668a"><span class="section-number-2">4</span> Timeline planning</h2>
+<div class="outline-text-2" id="text-4">
+</div>
+<div id="outline-container-org65181ea" class="outline-3">
+<h3 id="org65181ea"><span class="section-number-3">4.1</span> June</h3>
+<div class="outline-text-3" id="text-4-1">
+<ul class="org-ul">
+<li>find adviser and refine project idea</li>
+<li>determine problem datasets</li>
+<li>complete minikanren implementation</li>
+<li>produce training data</li>
+<li>register thesis</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org2cd319a" class="outline-3">
+<h3 id="org2cd319a"><span class="section-number-3">4.2</span> July &amp; August</h3>
+<div class="outline-text-3" id="text-4-2">
+<ul class="org-ul">
+<li>train neural network</li>
+<li>evaluation and introspection</li>
+<li>adjustments and further experiments</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org1d3336b" class="outline-3">
+<h3 id="org1d3336b"><span class="section-number-3">4.3</span> September</h3>
+<div class="outline-text-3" id="text-4-3">
+<ul class="org-ul">
+<li>finish thesis paper</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="date">Date: June 08, 2020</p>
+<p class="author">Author: Kuan Yu</p>
+<p class="date">Created: 2020-06-08 Mon 12:37</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
