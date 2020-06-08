@@ -39,7 +39,41 @@ This project aims at laying a solid and extensible groundwork for the following 
 
 ** Neural guided logical inference
 
-TODO
+[[https://arxiv.org/abs/1701.06972][Loos et al. (2017)]] demonstrated the usefulness of deep neural networks for guiding first-order logic proof search,
+where the networks were used for ranking clause selections in the [[https://wwwlehre.dhbw-stuttgart.de/~sschulz/E/E.html][E theorem prover]],
+which significantly reduced the number of proof search steps.
+They experimented with convolutional networks and tree LSTM networks.
+[[https://arxiv.org/abs/1805.07563][Kaliszyk et al. (2018)]] successfully applied reinforcement learning for first-order theorem proving,
+but with tableau calculus for finding refutational proofs.
+[[https://arxiv.org/abs/1811.00796][Kusumoto et al. (2018)]] trained graph networks with reinforcement learning
+for guiding the construction of proof trees in intuitionistic propositional logic using sequent calculus,
+which outperformed Coq's /tauto/ tactic.
+These works have shown the power of neural guidance for logical inference in limited contexts.
+
+[[https://arxiv.org/abs/1805.10872][Manhaeve et al. (2018)]] introduced /DeepProbLog/
+which integrated neural predicates, e.g. images, into probabilistic logic programming.
+[[https://arxiv.org/abs/1901.04195][Marra et al. (2019)]] used graph networks in probabilistic graphical models
+with MAP inference for modeling logical reasoning.
+These works explored the integration of probabilistic modeling and logical reasoning.
+The general direction of their approach, however, diverges from ours.
+Our goal is to harness the power of statistical methods
+while retaining the definitive nature of symbolic reasoning.
+
+Our approach is heavily inspired by [[https://arxiv.org/abs/1809.02840][Zhang et al. (2018)]]
+who showed the benefits of neural guidance for program synthesis.
+They experimented with recurrent LSTM networks and gated graph networks
+for synthesizing /Scheme/ programs using the /miniKanren/ logic programming system.
+The neural networks were trained with supervised curriculum and scheduled sampling
+to predict the ground-truth optimal candidates at each step for expanding the partially synthesized program.
+We discuss the following details in their work from which [[sec-proposal][our proposal]] differs.
+
+- They used neural networks for embedding constraints which depended on the target synthesis language.
+  The synthesis engine consisted of a few relational programs (e.g. =evalo=, =lookupo=)
+  each containing several candidate branches of constraints.
+  The weights of the networks were specialized for each relational program,
+  and the model predicts a distribution over the candidates in that program.
+- Their recurrent model was more efficient and performant, but it discarded variable identities.
+- During test time, they used a greedy policy.  Only the best predicted candidate was chosen.
 
 ** The miniKanren language
 
@@ -77,7 +111,7 @@ TODO
 ;;  ((1 2 3 4) ()))
 #+END_SRC
 
-Here is a faithful albeit non-idiomatic and clumsy translation in Prolog.
+Here is a faithful albeit non-idiomatic and clumsy translation in /Prolog/.
 
 #+BEGIN_SRC prolog
 append(L,S,Out) :- L = [], S = Out.
@@ -131,7 +165,7 @@ the importance of recursion
 
 *** Why miniKanren?
 
-- general recursion à la Prolog
+- general recursion à la /Prolog/
 - it's an extensible embedded language, with numerous extensions
 - minimal core (microKanren), easy to implement and extend
 - breath first search instead of depth first search, with one line of change
@@ -148,7 +182,7 @@ the importance of recursion
 
 TODO
 
-* Project proposal
+* <<sec-proposal>>Project proposal
 
 ** Where magic happens
 
@@ -327,7 +361,7 @@ we propose to embed each sub-expression recursively using one attention network.
 We start with a learned embedding matrix for special symbols and atomic data types.
 The embedding matrix consists of three regions,
 respectively for special symbols, constants, and variables.
-The number of special symbols are predetermined by the logical programming language,
+The number of special symbols are predetermined by the logic programming language,
 crucially the available types of constraints.
 Although an indefinite number of constants and variables are needed for solving problems of arbitrary complexities,
 we have to sacrifice that flexibility in order to interface with the neural model.
