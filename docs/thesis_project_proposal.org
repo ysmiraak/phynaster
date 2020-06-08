@@ -1,5 +1,5 @@
 #+TITLE: The road first taken: Optimizing choices in logical inference with neural network
-#+DATE: May 30, 2020
+#+DATE: June 08, 2020
 #+AUTHOR: Kuan Yu
 
 This is a project proposal for my master's thesis in the [[http://www.ling.uni-potsdam.de/cogsys/][Cognitive Systems]] program at the University of Potsdam.
@@ -77,22 +77,56 @@ We discuss the following details in their work from which [[sec-proposal][our pr
 
 ** The miniKanren language
 
-TODO
+We would like to use [[http://minikanren.org/][miniKanren]] as the basis of the logic programming system,
+for the following reasons.
 
-*** Basic examples
+- It is an embedded domain specific language with a [[http://webyrd.net/scheme-2013/papers/HemannMuKanren2013.pdf][minimal core]] which is easy to implement.
+  It has been implemented in over 40 host languages,
+  covering almost every common platforms.
+- It is a general logic programming system à la /Prolog/,
+  based on unification resolution,
+  supporting recursion or whatever the host language has to offer.
+- It is an extensible system, with numerous extensions
+  such as [[http://www.schemeworkshop.org/2011/papers/Alvis2011.pdf][constraint programming]], [[http://webyrd.net/alphamk/alphamk_workshop.pdf][nominal logic]], and [[https://github.com/webyrd/probKanren][probabilistic logic programming]].
+- It has well-understood [[http://okmij.org/ftp/papers/LogicT.pdf][computational effects]].
+  By default it performs an interleaving breadth-first search,
+  but this behavior can be easily changed to depth-first search or [[http://webyrd.net/scheme-2013/papers/Swords2013.pdf][guided search]].
+
+Here we introduce the [[https://github.com/webyrd/miniKanren-with-symbolic-constraints][canonical /Scheme/ version]] of the language with some basic examples.
 
 #+BEGIN_SRC scheme
 (run* [q] (== 1 q))
 ;; (1)
 #+END_SRC
 
+- The macro =run*= takes a list of query variables and one or more goal expressions,
+  and returns the list of all results satisfying the goals.
+- The goal constructor ~==~ is used for unification.
+
+#+BEGIN_SRC scheme
+(run* [p q]
+  (conde
+   [(== 0 p) (== 0 q)]
+   [(== 1 q) (== 2 q)]
+   [(== 3 p) (== 3 q)]))
+;; ((0 0) (3 3))
+#+END_SRC
+
+- The macro =conde= takes a number of goal lists,
+  creates the conjunction of goals within each list,
+  and returns a goal which is their disjunction.
+
 #+BEGIN_SRC scheme
 (run* [q]
-  (conde
-   [(== 0 q)]
-   [(== 1 q)]))
-;; (0 1)
+  (fresh [q]
+    (== 1 q)))
+;; (_.0)
 #+END_SRC
+
+- The macro =fresh= has a syntax similar to =run*=,
+  but returns a goal with freshly created variables.
+  It can be read as the existantial quantifier.
+- Symbols like =_.0= and =_.1= are used for representing unbound variables.
 
 #+BEGIN_SRC scheme
 (define (appendo l s out)
@@ -103,6 +137,9 @@ TODO
       (== (cons a res) out)
       (appendo d s res))]))
 
+(run* [r] (appendo '(1 2) '(3 4) r))
+;; ((1 2 3 4))
+
 (run* [p q] (appendo p q '(1 2 3 4)))
 ;; ((() (1 2 3 4))
 ;;  ((1) (2 3 4))
@@ -111,13 +148,21 @@ TODO
 ;;  ((1 2 3 4) ()))
 #+END_SRC
 
-Here is a faithful albeit non-idiomatic and clumsy translation in /Prolog/.
+- Goal constructors such as =appendo= are functions which return goals.
+  They are conventionally named with an =o= at the end.
+- A goal is a function which takes an inference state as input and returns a transformed state.
+  This is only relevant for extending the language.
+
+A literal and clumsy translation of the =appendo= example in /Prolog/ is as follows.
 
 #+BEGIN_SRC prolog
-append(L,S,Out) :- L = [], S = Out.
-append(L,S,Out) :- L = [A|D], Out = [A|Res], append(D,S,Res).
+appendo(L,S,Out) :- L = [], S = Out.
+appendo(L,S,Out) :- L = [A|D], Out = [A|Res], appendo(D,S,Res).
 
-?- append(P,Q,[1,2,3,4]).
+?- appendo([1,2],[3,4],R).
+%@ R = [1, 2, 3, 4].
+
+?- appendo(P,Q,[1,2,3,4]).
 %@ P = [],
 %@ Q = [1, 2, 3, 4] ;
 %@ P = [1],
@@ -129,53 +174,6 @@ append(L,S,Out) :- L = [A|D], Out = [A|Res], append(D,S,Res).
 %@ P = [1, 2, 3, 4],
 %@ Q = [] ;
 %@ false.
-#+END_SRC
-
-#+BEGIN_SRC scheme
-(run* [r] (appendo '(1 2) '(3 4) r))
-;; ((1 2 3 4))
-#+END_SRC
-
-the importance of recursion
-
-#+BEGIN_SRC scheme
-(define (nato n)
-  (conde
-   [(== 'z n)]
-   [(fresh [m]
-      (== (cons 's m) n)
-      (nato m))]))
-
-(run 4 [q] (nato q))
-;; (z (s . z) (s s . z) (s s s . z))
-#+END_SRC
-
-#+BEGIN_SRC scheme
-(define (addo m n o)
-  (conde
-   [(== 'z m) (== n o)]
-   [(fresh [l p]
-      (== (cons 's l) m)
-      (== (cons 's p) o)
-      (addo l n p))]))
-
-(run* [q] (addo '(s . z) '(s . z) q))
-;; ((s s . z))
-#+END_SRC
-
-*** Why miniKanren?
-
-- general recursion à la /Prolog/
-- it's an extensible embedded language, with numerous extensions
-- minimal core (microKanren), easy to implement and extend
-- breath first search instead of depth first search, with one line of change
-
-#+BEGIN_SRC scheme
-(define (bind $ g)
-  (cond
-    ((null? $) mzero)
-    ((procedure? $) (lambda () (bind ($) g)))
-    (else (mplus (g (car $)) (bind (cdr $) g)))))
 #+END_SRC
 
 * <<sec-proposal>>Project proposal
